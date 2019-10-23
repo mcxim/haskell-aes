@@ -12,3 +12,5 @@ type Block = [Byte]
 type Key = [Byte]
 
 blockSize = 16 :: Num a => a
+
+numRounds = 10 :: Num a => a
