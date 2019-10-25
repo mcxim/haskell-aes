@@ -24,6 +24,7 @@ library:
   dependencies:
   - base
   - word8
+  - bytestring
   source-dirs: library
 
 executables:

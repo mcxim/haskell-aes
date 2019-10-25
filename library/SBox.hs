@@ -1,4 +1,8 @@
-module SBox where
+module SBox
+  ( sBox
+  , sBoxInv
+  )
+where
 
 import           Lib
 
