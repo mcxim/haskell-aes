@@ -1,4 +1,4 @@
-module Lib where
+module Globals where
 
 import           Data.Word8
 import           Data.Bits
@@ -10,6 +10,8 @@ type Byte = Word8
 type Block = [Byte]
 
 type Key = [Byte]
+
+type SubKey = [Byte]
 
 blockSize = 16 :: Num a => a
 
