@@ -25,6 +25,7 @@ library:
   - base
   - word8
   - bytestring
+  - cryptonite
   source-dirs: library
 
 executables:
