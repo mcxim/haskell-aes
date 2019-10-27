@@ -9,7 +9,7 @@ author: "Maxim Gelfand"
 maintainer: "Maxim Gelfand"
 # synopsis: implementation of aes encryption in haskell.
 # description: implementation of aes encryption in haskell.
-# category: Other
+# category: Cryptography
 
 extra-source-files:
 - CHANGELOG.md
