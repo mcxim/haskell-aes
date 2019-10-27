@@ -8,4 +8,7 @@ import           Utils
 import           Globals
 
 shiftRows :: Block -> Block
-shiftRows block = B.concat $ zipWith rotWordLeft [0 .. 3] (splitEvery 4 block)
+shiftRows block = B.concat . B.transpose $ zipWith
+  rotWordLeft
+  [0 .. 3]
+  (B.transpose $ splitEvery 4 block)

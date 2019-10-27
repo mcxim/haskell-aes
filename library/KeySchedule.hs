@@ -11,7 +11,7 @@ import           Utils
 import           SBox
 
 genSubKeys :: Key -> [SubKey]
-genSubKeys key = helper roundCoefficients [key]
+genSubKeys key = tail $ helper roundCoefficients [key]
 
 helper :: [RoundCoefficient] -> [Key] -> [Key]
 helper []  keys         = keys

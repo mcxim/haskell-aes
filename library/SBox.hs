@@ -8,7 +8,7 @@ where
 import           Globals
 import qualified Data.ByteString               as B
 
-subBytes :: B.ByteString -> B.ByteString
+subBytes :: Block -> Block
 subBytes = B.map sBox
 
 sBox :: Byte -> Byte
