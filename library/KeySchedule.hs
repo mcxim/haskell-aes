@@ -1,4 +1,7 @@
-module KeySchedule where
+module KeySchedule
+  ( genSubKeys
+  )
+where
 
 import qualified Data.Word8                    as W
 import           Data.Bits
@@ -8,7 +11,7 @@ import           Utils
 import           SBox
 
 genSubKeys :: Key -> [B.ByteString]
-genSubKeys key = tail $ helper roundCoefficients [key]
+genSubKeys key = helper roundCoefficients [key]
 
 helper :: [B.ByteString] -> [B.ByteString] -> [B.ByteString]
 helper []  keys         = keys
@@ -18,10 +21,10 @@ helper rcs computedKeys = helper (tail rcs)
   (pw1 : pw2 : pw3 : pw4 : shouldBeNothing) = splitEvery 4 $ last computedKeys
   newSubKey :: [B.ByteString]
   newSubKey =
-    [ rotWordLeft 1 (subBytes pw4) `bsxor` pw1 `bsxor` head rcs
-    , head newSubKey `bsxor` pw2
-    , newSubKey !! 1 `bsxor` pw3
-    , newSubKey !! 2 `bsxor` pw4
+    [ rotWordLeft 1 (subBytes pw4) `bsXor` pw1 `bsXor` head rcs
+    , head newSubKey `bsXor` pw2
+    , newSubKey !! 1 `bsXor` pw3
+    , newSubKey !! 2 `bsXor` pw4
     ]
   newSubKeyConcatenated = B.concat newSubKey
 

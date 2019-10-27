@@ -1,8 +1,8 @@
 module Utils where
 
 import qualified Data.ByteString               as B
-import qualified GHC.Word                      as W
 import qualified Data.Bits
+import           Numeric                        ( showHex )
 
 snoc :: [a] -> a -> [a]
 snoc lst x = lst ++ [x]
@@ -15,5 +15,11 @@ splitEvery n list | list == B.empty = []
 rotWordLeft :: Int -> B.ByteString -> B.ByteString
 rotWordLeft n word = B.drop n word `B.append` B.take n word
 
-bsxor :: B.ByteString -> B.ByteString -> B.ByteString
-bsxor xs ys = B.pack $ B.zipWith Data.Bits.xor xs ys
+bsXor :: B.ByteString -> B.ByteString -> B.ByteString
+bsXor xs ys = B.pack $ B.zipWith Data.Bits.xor xs ys
+
+printBS :: B.ByteString -> IO ()
+printBS = print . B.unpack
+
+printBSL :: [B.ByteString] -> IO ()
+printBSL = putStrLn . unlines . map (unwords . map (`showHex` "") . B.unpack)
