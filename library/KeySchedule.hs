@@ -3,32 +3,40 @@ module KeySchedule
   )
 where
 
-import           Data.Word8
-import           Data.Bits
+-- Works.
+
 import qualified Data.ByteString               as B
 import           Globals
 import           Utils
 import           SBox
 
-genSubKeys :: Key -> [B.ByteString]
-genSubKeys key = tail $ helper (numRounds + 1) [key]
+genSubKeys :: Key -> [SubKey]
+genSubKeys key = helper roundCoefficients [key]
 
-helper :: Int -> [B.ByteString] -> [B.ByteString]
-helper 0          keys         = keys
-helper roundsLeft computedKeys = helper (roundsLeft - 1)
-                                        (computedKeys ++ [newSubKey])
+helper :: [RoundCoefficient] -> [Key] -> [Key]
+helper []  keys         = keys
+helper rcs computedKeys = helper (tail rcs)
+                                 (computedKeys `snoc` newSubKeyConcatenated)
  where
-  [pw1, pw2, pw3, pw4] = splitEvery 4 $ last computedKeys
-  newSubKey = B.concat
-    [ rotWordLeft 1 . subBytes $ pw4 `xor` pw1 `xor` undefined
-    , head newSubKey `xor` pw2
-    , newSubKey !! 1 `xor` pw3
-    , newSubKey !! 2 `xor` pw4
-    ]
+  (pw1 : pw2 : pw3 : pw4 : _) = splitEvery 4 $ last computedKeys
+  newSubKey =
+    [ rotWordLeft 1 (subBytes pw4) `bsXor` pw1 `bsXor` head rcs
+    , head newSubKey `bsXor` pw2
+    , newSubKey !! 1 `bsXor` pw3
+    , newSubKey !! 2 `bsXor` pw4
+    ] :: [B.ByteString]
+  newSubKeyConcatenated = B.concat newSubKey
 
--- g :: B.ByteString -> Byte -> B.ByteString
--- g bs roundConstant = (xor y roundConstant `B.cons` xs) `B.snoc` x
---  where
---   x  = B.head bs
---   y  = B.head . B.tail $ bs
---   xs = B.tail . B.tail $ bs
+roundCoefficients :: [RoundCoefficient]
+roundCoefficients =
+  [ B.pack [0x01, 0, 0, 0]
+  , B.pack [0x02, 0, 0, 0]
+  , B.pack [0x04, 0, 0, 0]
+  , B.pack [0x08, 0, 0, 0]
+  , B.pack [0x10, 0, 0, 0]
+  , B.pack [0x20, 0, 0, 0]
+  , B.pack [0x40, 0, 0, 0]
+  , B.pack [0x80, 0, 0, 0]
+  , B.pack [0x1B, 0, 0, 0]
+  , B.pack [0x36, 0, 0, 0]
+  ]
