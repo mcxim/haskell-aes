@@ -8,14 +8,12 @@ import           ShiftRows
 import           AddRoundKey
 import           MixColumns
 import           SBox
-import           Utils
 import           Globals
 import           KeySchedule
 
 decrypt :: Key -> Block -> Block
 decrypt key = helper (reverse $ genSubKeys key) 
  where
-  subKeys' = reverse $ genSubKeys key
   helper :: [SubKey] -> Block -> Block
   helper subKeys
     | length subKeys == 1

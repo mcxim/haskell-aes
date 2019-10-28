@@ -4,7 +4,6 @@ import qualified Data.ByteString               as B
 import qualified Data.Bits
 import           Numeric                        ( showHex )
 import           Data.Char                      ( toUpper )
-import qualified Data.ByteString.Lazy          as BL
 
 snoc :: [a] -> a -> [a]
 snoc lst x = lst ++ [x]
