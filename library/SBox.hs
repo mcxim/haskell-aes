@@ -2,6 +2,7 @@ module SBox
   ( sBox
   , sBoxInv
   , subBytes
+  , invSubBytes
   )
 where
 
@@ -10,6 +11,9 @@ import qualified Data.ByteString               as B
 
 subBytes :: Block -> Block
 subBytes = B.map sBox
+
+invSubBytes :: Block -> Block
+invSubBytes = B.map sBoxInv
 
 sBox :: Byte -> Byte
 sBox = (_sBox !!) . fromIntegral
