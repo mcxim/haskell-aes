@@ -10,6 +10,8 @@ type Byte = Word8
 
 type Block = B.ByteString
 
+type BlockString = B.ByteString
+
 type Key = B.ByteString
 
 type SubKey = B.ByteString

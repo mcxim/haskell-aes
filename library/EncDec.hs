@@ -1,11 +1,4 @@
-module EncDec
-  ( encrypt
-  , decrypt
-  , testAES
-  , encryptStream
-  , decryptStream
-  )
-where
+module EncDec where
 
 import           ShiftRows
 import           AddRoundKey
@@ -14,6 +7,9 @@ import           SBox
 import           Globals
 import           Utils
 import           KeySchedule
+import qualified Data.ByteString               as B
+import qualified Data.Word8                    as W
+import           Data.Char                      ( ord )
 
 encryptStream :: ModeOfOperation -> InitVector -> Key -> [Block] -> [Block]
 encryptStream ECB _  key blocks = map (encrypt key) blocks
@@ -57,6 +53,14 @@ encrypt key = helper (genSubKeys key)
       . shiftRows
       . subBytes
 
+toBlocks :: String -> BlockString
+toBlocks = undefined
+
+pad :: String -> Block
+pad string = B.pack . map toByte
+
+toByte :: Char -> W.Word8
+toByte = fromIntegral . ord
 
 testAES :: Key -> Block -> IO ()
 testAES key block = printBS block >> printBS encrypted >> printBS
