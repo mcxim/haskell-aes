@@ -25,6 +25,7 @@ library:
   - base
   - word8
   - bytestring
+  - bytestring-conversion
   - cryptonite
   source-dirs: library
 
@@ -35,6 +36,7 @@ executables:
     dependencies:
     - base
     - haskell-aes
+    - bytestring
     ghc-options:
     - -rtsopts
     - -threaded

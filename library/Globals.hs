@@ -10,13 +10,13 @@ type Byte = Word8
 
 type Block = B.ByteString
 
-type BlockString = B.ByteString
+type BlockStream = B.ByteString
 
 type Key = B.ByteString
 
 type SubKey = B.ByteString
 
-type InitVector = B.ByteString
+type InitializationVector = B.ByteString
 
 type RoundCoefficient = B.ByteString
 
