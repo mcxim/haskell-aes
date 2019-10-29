@@ -14,6 +14,8 @@ type Key = B.ByteString
 
 type SubKey = B.ByteString
 
+type InitVector = B.ByteString
+
 type RoundCoefficient = B.ByteString
 
 blockSize = 16 :: Int

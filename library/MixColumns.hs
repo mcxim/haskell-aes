@@ -22,7 +22,8 @@ invMixColumns :: Block -> Block
 invMixColumns = common invMatrix
 
 common :: [B.ByteString] -> Block -> Block
-common someMatrix = B.concat . map (mulMV aesPolynomial someMatrix) . splitEvery 4
+common someMatrix =
+  B.concat . map (mulMV aesPolynomial someMatrix) . splitEvery 4
 
 mulMV :: Integer -> [B.ByteString] -> B.ByteString -> B.ByteString
 mulMV polynomial matrix vector =
