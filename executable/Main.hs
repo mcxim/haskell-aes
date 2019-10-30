@@ -9,7 +9,7 @@ import           Globals
 
 main :: IO ()
 main = do
-  fhandle  <- SIO.openFile "plaintext.txt" SIO.ReadMode
+  fhandle  <- SIO.openFile "result.txt" SIO.ReadMode
   khandle  <- SIO.openFile "key.txt" SIO.ReadMode
   ivhandle <- SIO.openFile "iv.txt" SIO.ReadMode
   contents <- B.hGetContents fhandle
@@ -22,4 +22,6 @@ main = do
   putStrLn "iv: "
   printBS $ padKeyIV iv
   putStrLn "result: "
-  printBS $ encryptStream ECB iv key contents
+  -- printBS $ decryptStream CBC iv key contents
+  B.writeFile "plaintext.txt" $ encryptStream ECB iv key contents
+  putStrLn "Done."

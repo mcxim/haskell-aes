@@ -11,6 +11,7 @@ import qualified Data.ByteString               as B
 import qualified Data.ByteString.Conversion    as BC
 import qualified Data.Word8                    as W
 import           Data.Char                      ( ord )
+import           Debug.Trace                    ( trace )
 
 encryptStream
   :: ModeOfOperation
@@ -28,10 +29,10 @@ encryptStream modeOfOperation iv key blocks
   = undefined
  where
   cbcEncHelper :: Block -> Key -> [Block] -> [Block]
-  cbcEncHelper _         _   []     = []
-  cbcEncHelper prevBlock key blocks = result
-    : cbcEncHelper result key (tail blocks)
-    where result = encrypt key (head blocks `bsXor` prevBlock)
+  cbcEncHelper _ _ [] = []
+  cbcEncHelper prevBlock key (block : blocks) =
+    result : cbcEncHelper result key blocks
+    where result = encrypt key (block `bsXor` prevBlock)
 
 decryptStream
   :: ModeOfOperation
@@ -43,9 +44,29 @@ decryptStream modeOfOperation iv key blocks
   | modeOfOperation == ECB
   = B.concat . map (decrypt (padKeyIV key)) . splitEvery 16 . pad $ blocks
   | modeOfOperation == CBC
-  = undefined
+  = B.concat
+    $ cbcDecHelper (padKeyIV iv) (padKeyIV key) (splitEvery 16 (pad blocks))
   | modeOfOperation == CTR
   = undefined
+ where
+  cbcDecHelper :: Block -> Key -> [Block] -> [Block]
+  -- cbcDecHelper prevCipherText key bs
+  --   | trace
+  --     (  "cbcDecHelper: \nprev: "
+  --     ++ reprBS prevCipherText
+  --     ++ "\nkey: "
+  --     ++ reprBS key
+  --     ++ "\nbs: "
+  --     ++ reprBSL bs
+  --     )
+  --     False
+  --   = undefined
+  cbcDecHelper prevCipherText key [block] =
+    pure $ decrypt key block `bsXor` prevCipherText
+  cbcDecHelper prevCipherText key (block : blocks) =
+    decrypt key block `bsXor` prevCipherText : cbcDecHelper (head blocks)
+                                                            key
+                                                            (tail blocks)
 
 encrypt :: Key -> Block -> Block
 encrypt key = helper (genSubKeys key)
