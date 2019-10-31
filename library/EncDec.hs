@@ -50,17 +50,6 @@ decryptStream modeOfOperation iv key blocks
   = undefined
  where
   cbcDecHelper :: Block -> Key -> [Block] -> [Block]
-  -- cbcDecHelper prevCipherText key bs
-  --   | trace
-  --     (  "cbcDecHelper: \nprev: "
-  --     ++ reprBS prevCipherText
-  --     ++ "\nkey: "
-  --     ++ reprBS key
-  --     ++ "\nbs: "
-  --     ++ reprBSL bs
-  --     )
-  --     False
-  --   = undefined
   cbcDecHelper prevCipherText key [block] =
     pure $ decrypt key block `bsXor` prevCipherText
   cbcDecHelper prevCipherText key (block : blocks) =
