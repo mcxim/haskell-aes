@@ -25,8 +25,6 @@ encryptStream modeOfOperation iv key blocks
   | modeOfOperation == CBC
   = B.concat
     $ cbcEncHelper (padKeyIV iv) (padKeyIV key) (splitEvery 16 (pad blocks))
-  | modeOfOperation == CTR
-  = undefined
  where
   cbcEncHelper :: Block -> Key -> [Block] -> [Block]
   cbcEncHelper _ _ [] = []
@@ -40,14 +38,14 @@ decryptStream
   -> Key
   -> BlockStream
   -> BlockStream
+decryptStream m i k b
+  | trace ("key: " ++ reprBS k ++ ", blocks: " ++ reprBS b) False = undefined
 decryptStream modeOfOperation iv key blocks
   | modeOfOperation == ECB
   = B.concat . map (decrypt (padKeyIV key)) . splitEvery 16 . pad $ blocks
   | modeOfOperation == CBC
   = B.concat
     $ cbcDecHelper (padKeyIV iv) (padKeyIV key) (splitEvery 16 (pad blocks))
-  | modeOfOperation == CTR
-  = undefined
  where
   cbcDecHelper :: Block -> Key -> [Block] -> [Block]
   cbcDecHelper prevCipherText key [block] =
