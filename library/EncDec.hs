@@ -42,10 +42,16 @@ decryptStream
   -> BlockStream
 decryptStream modeOfOperation iv key blocks
   | modeOfOperation == ECB
-  = B.concat . map (decrypt (padKeyIV key)) . splitEvery 16 . pad $ blocks
-  | modeOfOperation == CBC
   = B.concat
-    $ cbcDecHelper (padKeyIV iv) (padKeyIV key) (splitEvery 16 (pad blocks))
+    . unpad
+    . map (decrypt (padKeyIV key))
+    . splitEvery 16
+    . pad
+    $ blocks
+  | modeOfOperation == CBC
+  = B.concat . unpad $ cbcDecHelper (padKeyIV iv)
+                                     (padKeyIV key)
+                                     (splitEvery 16 (pad blocks))
   | modeOfOperation == CTR
   = undefined
  where
@@ -53,9 +59,7 @@ decryptStream modeOfOperation iv key blocks
   cbcDecHelper prevCipherText key [block] =
     pure $ decrypt key block `bsXor` prevCipherText
   cbcDecHelper prevCipherText key (block : blocks) =
-    decrypt key block `bsXor` prevCipherText : cbcDecHelper (head blocks)
-                                                            key
-                                                            (tail blocks)
+    decrypt key block `bsXor` prevCipherText : cbcDecHelper block key blocks
 
 encrypt :: Key -> Block -> Block
 encrypt key = helper (genSubKeys key)
@@ -93,7 +97,13 @@ toByte :: Char -> W.Word8
 toByte = fromIntegral . ord
 
 pad :: BlockStream -> BlockStream
-pad blocks = blocks `B.append` B.replicate (16 - (B.length blocks `mod` 16)) 0
+pad blocks = blocks
+  `B.append` B.replicate (if modulo == 0 then 0 else 16 - modulo) 0
+  where modulo = B.length blocks `mod` 16
+
+unpad :: [Block] -> [Block]
+unpad blocks =
+  init blocks ++ [B.reverse . B.dropWhile (== 0) . B.reverse . last $ blocks]
 
 padKeyIV :: B.ByteString -> Key
 padKeyIV key = key `B.append` B.replicate (16 - B.length key) 0

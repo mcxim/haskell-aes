@@ -27,6 +27,7 @@ library:
   - bytestring
   - bytestring-conversion
   - cryptonite
+  - ghc
   source-dirs: library
 
 executables:
