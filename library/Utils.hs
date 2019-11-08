@@ -4,6 +4,7 @@ import qualified Data.ByteString               as B
 import qualified Data.Bits
 import           Numeric                        ( showHex )
 import           Data.Char                      ( toUpper )
+import Globals
 
 snoc :: [a] -> a -> [a]
 snoc lst x = lst ++ [x]
@@ -38,3 +39,6 @@ printBSL = putStrLn . reprBSL
 
 zfill :: Int -> String -> String
 zfill num str = replicate (num - length str) '0' ++ str
+
+-- genCounts :: InitializationVector -> [InitializationVector]
+-- genCounts nonce = []

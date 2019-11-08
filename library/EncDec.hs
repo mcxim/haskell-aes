@@ -8,10 +8,8 @@ import           Globals
 import           Utils
 import           KeySchedule
 import qualified Data.ByteString               as B
-import qualified Data.ByteString.Conversion    as BC
 import qualified Data.Word8                    as W
 import           Data.Char                      ( ord )
-import           Debug.Trace                    ( trace )
 
 encryptStream
   :: ModeOfOperation
@@ -26,6 +24,10 @@ encryptStream modeOfOperation iv key blocks
   = B.concat $ cbcEncHelper (padKeyIV iv)
                             (padKeyIV key)
                             (splitEvery 16 (padPkcs7 blocks))
+  | modeOfOperation == CTR
+  = undefined
+  | otherwise
+  = undefined
  where
   cbcEncHelper :: Block -> Key -> [Block] -> [Block]
   cbcEncHelper _ _ [] = []
@@ -53,12 +55,15 @@ decryptStream modeOfOperation iv key blocks
                                          (splitEvery 16 blocks)
   | modeOfOperation == CTR
   = undefined
+  | otherwise
+  = undefined
  where
   cbcDecHelper :: Block -> Key -> [Block] -> [Block]
   cbcDecHelper prevCipherText key [block] =
     pure $ decrypt key block `bsXor` prevCipherText
   cbcDecHelper prevCipherText key (block : blocks) =
     decrypt key block `bsXor` prevCipherText : cbcDecHelper block key blocks
+  cbcDecHelper _ _ _ = undefined
 
 encrypt :: Key -> Block -> Block
 encrypt key = helper (genSubKeys key)
@@ -118,7 +123,6 @@ unpadPkcs7 blocks =
 
 padKeyIV :: B.ByteString -> Key
 padKeyIV key = key `B.append` B.replicate (16 - B.length key) 0
-  where len = B.length key
 
 testAES :: Key -> Block -> IO ()
 testAES key block = printBS block >> printBS encrypted >> printBS
