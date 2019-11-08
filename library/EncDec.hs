@@ -8,10 +8,8 @@ import           Globals
 import           Utils
 import           KeySchedule
 import qualified Data.ByteString               as B
-import qualified Data.ByteString.Conversion    as BC
 import qualified Data.Word8                    as W
 import           Data.Char                      ( ord )
-import           Debug.Trace                    ( trace )
 
 encryptStream
   :: ModeOfOperation
@@ -118,7 +116,6 @@ unpadPkcs7 blocks =
 
 padKeyIV :: B.ByteString -> Key
 padKeyIV key = key `B.append` B.replicate (16 - B.length key) 0
-  where len = B.length key
 
 testAES :: Key -> Block -> IO ()
 testAES key block = printBS block >> printBS encrypted >> printBS
