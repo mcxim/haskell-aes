@@ -21,10 +21,11 @@ encryptStream
   -> BlockStream
 encryptStream modeOfOperation iv key blocks
   | modeOfOperation == ECB
-  = B.concat . map (encrypt (padKeyIV key)) . splitEvery 16 . pad $ blocks
+  = B.concat . map (encrypt (padKeyIV key)) . splitEvery 16 . padPkcs7 $ blocks
   | modeOfOperation == CBC
-  = B.concat
-    $ cbcEncHelper (padKeyIV iv) (padKeyIV key) (splitEvery 16 (pad blocks))
+  = B.concat $ cbcEncHelper (padKeyIV iv)
+                            (padKeyIV key)
+                            (splitEvery 16 (padPkcs7 blocks))
  where
   cbcEncHelper :: Block -> Key -> [Block] -> [Block]
   cbcEncHelper _ _ [] = []
@@ -38,20 +39,18 @@ decryptStream
   -> Key
   -> BlockStream
   -> BlockStream
-decryptStream m i k b
-  | trace ("key: " ++ reprBS k ++ ", blocks: " ++ reprBS b) False = undefined
 decryptStream modeOfOperation iv key blocks
   | modeOfOperation == ECB
   = B.concat
-    . unpad
+    . unpadPkcs7
     . map (decrypt (padKeyIV key))
     . splitEvery 16
     . pad
     $ blocks
   | modeOfOperation == CBC
-  = B.concat . unpad $ cbcDecHelper (padKeyIV iv)
-                                    (padKeyIV key)
-                                    (splitEvery 16 (pad blocks))
+  = B.concat . unpadPkcs7 $ cbcDecHelper (padKeyIV iv)
+                                         (padKeyIV key)
+                                         (splitEvery 16 blocks)
   | modeOfOperation == CTR
   = undefined
  where
@@ -105,6 +104,18 @@ unpad :: [Block] -> [Block]
 unpad blocks =
   init blocks ++ [B.reverse . B.dropWhile (== 0) . B.reverse . last $ blocks]
 
+padPkcs7 :: BlockStream -> BlockStream
+padPkcs7 blocks = blocks `B.append` B.replicate padNum (fromIntegral padNum)
+  where padNum = 16 - (B.length blocks `mod` 16)
+
+unpadPkcs7 :: [Block] -> [Block]
+unpadPkcs7 blocks =
+  xs ++ [B.reverse . B.dropWhile (== fromIntegral padLength) . B.reverse $ x]
+ where
+  xs        = init blocks
+  x         = last blocks
+  padLength = B.last x
+
 padKeyIV :: B.ByteString -> Key
 padKeyIV key = key `B.append` B.replicate (16 - B.length key) 0
   where len = B.length key
@@ -114,3 +125,4 @@ testAES key block = printBS block >> printBS encrypted >> printBS
   (decrypt key encrypted)
   where encrypted = encrypt key block
 
+testBS = B.pack [1]
