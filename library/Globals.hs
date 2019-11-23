@@ -6,6 +6,8 @@ import qualified Data.ByteString               as B
 
 data ModeOfOperation = ECB | CBC | CTR deriving (Show, Eq)
 
+data KeySize = KS128 | KS192 | KS256 deriving (Show, Eq)
+
 type Byte = Word8
 
 type Block = B.ByteString
@@ -22,10 +24,17 @@ type RoundCoefficient = B.ByteString
 
 blockSize = 16 :: Int
 
-numRounds = 10 :: Int
+numRounds :: KeySize -> Int
+numRounds KS128 = 10
+numRounds KS192 = 12
+numRounds KS256 = 14
+
+getKeySize :: KeySize -> Int
+getKeySize KS128 = 16
+getKeySize KS192 = 24
+getKeySize KS256 = 32
 
 aesPolynomial = 0x11B -- x^8+x^4+x^3+x+1 -> 100011011 -> 0x11B
-
 
 mulPolynomial :: Integer -> Integer -> Integer
 mulPolynomial = mulF2m aesPolynomial
@@ -37,10 +46,10 @@ sampleKey =
     , 0x15
     , 0x16
     , 0x28
-    , 0xae
+    , 0xAE
     , 0xD2
     , 0xA6
-    , 0xAb
+    , 0xAB
     , 0xF7
     , 0x15
     , 0x88
@@ -49,6 +58,71 @@ sampleKey =
     , 0x4F
     , 0x3C
     ] :: Key
+    -- 2B7E151628AED2A6ABF7158809CF4F3C
+
+sampleKey192 = B.pack
+  [ 0x2B
+  , 0x7E
+  , 0x15
+  , 0x16
+  , 0x28
+  , 0xae
+  , 0xD2
+  , 0xA6
+  , 0xAb
+  , 0xF7
+  , 0x15
+  , 0x88
+  , 0x09
+  , 0xCF
+  , 0x4F
+  , 0x3C
+  , 0x2B
+  , 0x7E
+  , 0x15
+  , 0x16
+  , 0x28
+  , 0xae
+  , 0xD2
+  , 0xA6
+  ] :: Key
+  --2B7E151628AED2A6ABF7158809CF4F3C2B7E151628AED2A6
+
+sampleKey256 = B.pack
+  [ 0x2B
+  , 0x7E
+  , 0x15
+  , 0x16
+  , 0x28
+  , 0xae
+  , 0xD2
+  , 0xA6
+  , 0xAb
+  , 0xF7
+  , 0x15
+  , 0x88
+  , 0x09
+  , 0xCF
+  , 0x4F
+  , 0x3C
+  , 0x2B
+  , 0x7E
+  , 0x15
+  , 0x16
+  , 0x28
+  , 0xae
+  , 0xD2
+  , 0xA6
+  , 0xAb
+  , 0xF7
+  , 0x15
+  , 0x88
+  , 0x09
+  , 0xCF
+  , 0x4F
+  , 0x3C
+  ] :: Key
+  --2B7E151628AED2A6ABF7158809CF4F3C2B7E151628AED2A6ABF7158809CF4F3C
 
 sampleBlock =
   B.pack

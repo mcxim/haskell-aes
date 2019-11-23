@@ -10,102 +10,100 @@ import           KeySchedule
 import qualified Data.ByteString               as B
 import qualified Data.Word8                    as W
 import           Data.Char                      ( ord )
+import           Debug.Trace                    ( trace )
 
 encryptStream
   :: ModeOfOperation
   -> InitializationVector
   -> Key
+  -> KeySize
   -> BlockStream
   -> BlockStream
-encryptStream modeOfOperation iv key blocks
+encryptStream modeOfOperation iv key keySize blocks
   | modeOfOperation == ECB
-  = B.concat . map (encrypt (padKeyIV key)) . splitEvery 16 . padPkcs7 $ blocks
+  = B.concat . map (encrypt subKeys keySize) . splitEvery 16 . padPkcs7 $ blocks
   | modeOfOperation == CBC
-  = B.concat $ cbcEncHelper (padKeyIV iv)
-                            (padKeyIV key)
-                            (splitEvery 16 (padPkcs7 blocks))
+  = B.concat $ cbcEncHelper (padIV iv) (splitEvery 16 (padPkcs7 blocks))
   | modeOfOperation == CTR
   = undefined
   | otherwise
   = undefined
  where
-  cbcEncHelper :: Block -> Key -> [Block] -> [Block]
-  cbcEncHelper _ _ [] = []
-  cbcEncHelper prevBlock key (block : blocks) =
-    result : cbcEncHelper result key blocks
-    where result = encrypt key (block `bsXor` prevBlock)
+  subKeys = genSubKeys (padKey key keySize) keySize
+  cbcEncHelper :: Block -> [Block] -> [Block]
+  cbcEncHelper _         []               = []
+  cbcEncHelper prevBlock (block : blocks) = result : cbcEncHelper result blocks
+    where result = encrypt subKeys keySize (block `bsXor` prevBlock)
 
 decryptStream
   :: ModeOfOperation
   -> InitializationVector
   -> Key
+  -> KeySize
   -> BlockStream
   -> BlockStream
-decryptStream modeOfOperation iv key blocks
+decryptStream modeOfOperation iv key keySize blocks
   | modeOfOperation == ECB
   = B.concat
     . unpadPkcs7
-    . map (decrypt (padKeyIV key))
+    . map (decrypt subKeys keySize)
     . splitEvery 16
-    . pad
     $ blocks
   | modeOfOperation == CBC
-  = B.concat . unpadPkcs7 $ cbcDecHelper (padKeyIV iv)
-                                         (padKeyIV key)
-                                         (splitEvery 16 blocks)
+  = B.concat . unpadPkcs7 $ cbcDecHelper (padIV iv) (splitEvery 16 blocks)
   | modeOfOperation == CTR
   = undefined
   | otherwise
   = undefined
  where
-  cbcDecHelper :: Block -> Key -> [Block] -> [Block]
-  cbcDecHelper prevCipherText key [block] =
-    pure $ decrypt key block `bsXor` prevCipherText
-  cbcDecHelper prevCipherText key (block : blocks) =
-    decrypt key block `bsXor` prevCipherText : cbcDecHelper block key blocks
-  cbcDecHelper _ _ _ = undefined
+  subKeys = reverse $ genSubKeys (padKey key keySize) keySize
+  cbcDecHelper :: Block -> [Block] -> [Block]
+  cbcDecHelper prevCipherText [block] =
+    pure $ decrypt subKeys keySize block `bsXor` prevCipherText
+  cbcDecHelper prevCipherText (block : blocks) =
+    decrypt subKeys keySize block
+      `bsXor` prevCipherText
+      :       cbcDecHelper block blocks
+  cbcDecHelper _ _ = undefined
 
-encrypt :: Key -> Block -> Block
-encrypt key = helper (genSubKeys key)
- where
-  helper :: [SubKey] -> Block -> Block
-  helper subKeys
-    | length subKeys == 1
-    = addRoundKey (head subKeys) . shiftRows . subBytes
-    | length subKeys == 11
-    = helper (tail subKeys) . addRoundKey (head subKeys)
-    | otherwise
-    = helper (tail subKeys)
-      . addRoundKey (head subKeys)
-      . mixColumns
-      . shiftRows
-      . subBytes
+  -- | trace ("Current state: " ++ reprBS block ++ "\nSubkeys Left: " ++ show (length subKeys)) False = undefined
+encrypt :: [SubKey] -> KeySize -> Block -> Block
+encrypt subKeys keySize block
+  | length subKeys == 1
+  = addRoundKey (head subKeys) . shiftRows . subBytes $ block
+  | length subKeys == numRounds keySize + 1
+  = encrypt (tail subKeys) keySize . addRoundKey (head subKeys) $ block
+  | otherwise
+  = encrypt (tail subKeys) keySize
+    . addRoundKey (head subKeys)
+    . mixColumns
+    . shiftRows
+    . subBytes
+    $ block
 
-decrypt :: Key -> Block -> Block
-decrypt key = helper (reverse $ genSubKeys key)
- where
-  helper :: [SubKey] -> Block -> Block
-  helper subKeys
-    | length subKeys == 1
-    = addRoundKey (head subKeys) . invSubBytes . invShiftRows
-    | length subKeys == 11
-    = helper (tail subKeys) . addRoundKey (head subKeys)
-    | otherwise
-    = helper (tail subKeys)
-      . invMixColumns
-      . addRoundKey (head subKeys)
-      . invSubBytes
-      . invShiftRows
+-- SHOULD GET SUBKEYS IN REVERSED ORDER!
+decrypt :: [SubKey] -> KeySize -> Block -> Block
+decrypt subKeys keySize
+  | length subKeys == 1
+  = addRoundKey (head subKeys) . invSubBytes . invShiftRows
+  | length subKeys == numRounds keySize + 1
+  = decrypt (tail subKeys) keySize . addRoundKey (head subKeys)
+  | otherwise
+  = decrypt (tail subKeys) keySize
+    . invMixColumns
+    . addRoundKey (head subKeys)
+    . invSubBytes
+    . invShiftRows
 
 toByte :: Char -> W.Word8
 toByte = fromIntegral . ord
 
-pad :: BlockStream -> BlockStream
+pad :: BlockStream -> BlockStream -- deprecated
 pad blocks = blocks
   `B.append` B.replicate (if modulo == 0 then 0 else 16 - modulo) 0
   where modulo = B.length blocks `mod` 16
 
-unpad :: [Block] -> [Block]
+unpad :: [Block] -> [Block] -- deprecated
 unpad blocks =
   init blocks ++ [B.reverse . B.dropWhile (== 0) . B.reverse . last $ blocks]
 
@@ -121,12 +119,26 @@ unpadPkcs7 blocks =
   x         = last blocks
   padLength = B.last x
 
-padKeyIV :: B.ByteString -> Key
-padKeyIV key = key `B.append` B.replicate (16 - B.length key) 0
+padKey :: B.ByteString -> KeySize -> Key
+padKey key keySize =
+  key `B.append` B.replicate (getKeySize keySize - B.length key) 0
 
-testAES :: Key -> Block -> IO ()
-testAES key block = printBS block >> printBS encrypted >> printBS
-  (decrypt key encrypted)
-  where encrypted = encrypt key block
+padIV :: B.ByteString -> InitializationVector
+padIV iv = iv `B.append` B.replicate (16 - B.length iv) 0
 
 testBS = B.pack [1]
+
+testBlock = do
+  let ks = KS128
+  testKS ks
+  putStrLn "Original block: "
+  printBS sampleBlock
+  let subKeys = genSubKeys (padKey sampleKey ks) ks
+  putStrLn "SubKeys: "
+  printBSL subKeys
+  let encryptedBlock = encrypt subKeys ks sampleBlock
+  putStrLn "Encrypted block: "
+  printBS encryptedBlock
+  let decryptedBlock = decrypt (reverse subKeys) ks encryptedBlock
+  putStrLn "Decrypted block: "
+  printBS decryptedBlock
