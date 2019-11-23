@@ -9,7 +9,6 @@ import qualified Data.ByteString               as B
 import           Globals
 import           Utils
 import           SBox
-import           Debug.Trace                    ( trace )
 
 genSubKeys :: Key -> KeySize -> [SubKey]
 genSubKeys key KS128 =
@@ -41,7 +40,6 @@ helper192 rcs computedKeys = helper192
   (computedKeys `B.append` B.concat newSubKey)
  where
   lenRcs = length rcs
-  _      = trace ("" ++ "") ()
   (pw1 : pw2 : pw3 : pw4 : pw5 : pw6 : _) =
     splitEvery 4 . B.reverse . B.take 24 . B.reverse $ computedKeys
   newSubKey = take

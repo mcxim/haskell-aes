@@ -10,7 +10,6 @@ import           KeySchedule
 import qualified Data.ByteString               as B
 import qualified Data.Word8                    as W
 import           Data.Char                      ( ord )
-import           Debug.Trace                    ( trace )
 
 encryptStream
   :: ModeOfOperation
@@ -56,7 +55,7 @@ decryptStream modeOfOperation iv key keySize blocks
   | otherwise
   = undefined
  where
-  subKeys = reverse $ genSubKeys (padKey key keySize) keySize
+  subKeys = genSubKeys (padKey key keySize) keySize
   cbcDecHelper :: Block -> [Block] -> [Block]
   cbcDecHelper prevCipherText [block] =
     pure $ decrypt subKeys keySize block `bsXor` prevCipherText
@@ -66,7 +65,6 @@ decryptStream modeOfOperation iv key keySize blocks
       :       cbcDecHelper block blocks
   cbcDecHelper _ _ = undefined
 
-  -- | trace ("Current state: " ++ reprBS block ++ "\nSubkeys Left: " ++ show (length subKeys)) False = undefined
 encrypt :: [SubKey] -> KeySize -> Block -> Block
 encrypt subKeys keySize block
   | length subKeys == 1
@@ -81,31 +79,21 @@ encrypt subKeys keySize block
     . subBytes
     $ block
 
--- SHOULD GET SUBKEYS IN REVERSED ORDER!
 decrypt :: [SubKey] -> KeySize -> Block -> Block
 decrypt subKeys keySize
   | length subKeys == 1
-  = addRoundKey (head subKeys) . invSubBytes . invShiftRows
+  = addRoundKey (last subKeys) . invSubBytes . invShiftRows
   | length subKeys == numRounds keySize + 1
-  = decrypt (tail subKeys) keySize . addRoundKey (head subKeys)
+  = decrypt (init subKeys) keySize . addRoundKey (head subKeys)
   | otherwise
-  = decrypt (tail subKeys) keySize
+  = decrypt (init subKeys) keySize
     . invMixColumns
-    . addRoundKey (head subKeys)
+    . addRoundKey (last subKeys)
     . invSubBytes
     . invShiftRows
 
 toByte :: Char -> W.Word8
 toByte = fromIntegral . ord
-
-pad :: BlockStream -> BlockStream -- deprecated
-pad blocks = blocks
-  `B.append` B.replicate (if modulo == 0 then 0 else 16 - modulo) 0
-  where modulo = B.length blocks `mod` 16
-
-unpad :: [Block] -> [Block] -- deprecated
-unpad blocks =
-  init blocks ++ [B.reverse . B.dropWhile (== 0) . B.reverse . last $ blocks]
 
 padPkcs7 :: BlockStream -> BlockStream
 padPkcs7 blocks = blocks `B.append` B.replicate padNum (fromIntegral padNum)
