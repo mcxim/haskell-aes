@@ -84,7 +84,7 @@ decrypt subKeys keySize
   | length subKeys == 1
   = addRoundKey (last subKeys) . invSubBytes . invShiftRows
   | length subKeys == numRounds keySize + 1
-  = decrypt (init subKeys) keySize . addRoundKey (head subKeys)
+  = decrypt (init subKeys) keySize . addRoundKey (last subKeys)
   | otherwise
   = decrypt (init subKeys) keySize
     . invMixColumns
@@ -127,6 +127,6 @@ testBlock = do
   let encryptedBlock = encrypt subKeys ks sampleBlock
   putStrLn "Encrypted block: "
   printBS encryptedBlock
-  let decryptedBlock = decrypt (reverse subKeys) ks encryptedBlock
+  let decryptedBlock = decrypt subKeys ks encryptedBlock
   putStrLn "Decrypted block: "
   printBS decryptedBlock
