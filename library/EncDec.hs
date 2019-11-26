@@ -10,6 +10,7 @@ import           KeySchedule
 import qualified Data.ByteString               as B
 import qualified Data.Word8                    as W
 import           Data.Char                      ( ord )
+import Debug.Trace (trace)
 
 encryptStream
   :: ModeOfOperation
@@ -63,21 +64,20 @@ decryptStream modeOfOperation iv key keySize blocks
     decrypt subKeys keySize block
       `bsXor` prevCipherText
       :       cbcDecHelper block blocks
-  cbcDecHelper _ _ = undefined
+  cbcDecHelper arg1 arg2 = error (show arg1 ++ ", " ++ show arg2)
 
 encrypt :: [SubKey] -> KeySize -> Block -> Block
-encrypt subKeys keySize block
+encrypt subKeys keySize
   | length subKeys == 1
-  = addRoundKey (head subKeys) . shiftRows . subBytes $ block
+  = addRoundKey (head subKeys) . shiftRows . subBytes
   | length subKeys == numRounds keySize + 1
-  = encrypt (tail subKeys) keySize . addRoundKey (head subKeys) $ block
+  = encrypt (tail subKeys) keySize . addRoundKey (head subKeys)
   | otherwise
   = encrypt (tail subKeys) keySize
     . addRoundKey (head subKeys)
     . mixColumns
     . shiftRows
     . subBytes
-    $ block
 
 decrypt :: [SubKey] -> KeySize -> Block -> Block
 decrypt subKeys keySize
