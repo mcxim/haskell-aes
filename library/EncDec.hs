@@ -10,7 +10,7 @@ import           KeySchedule
 import qualified Data.ByteString               as B
 import qualified Data.Word8                    as W
 import           Data.Char                      ( ord )
-import Debug.Trace (trace)
+import           Debug.Trace                    ( trace )
 
 encryptStream
   :: ModeOfOperation
@@ -23,7 +23,7 @@ encryptStream modeOfOperation iv key keySize blocks
   | modeOfOperation == ECB
   = B.concat . map (encrypt subKeys keySize) . splitEvery 16 . padPkcs7 $ blocks
   | modeOfOperation == CBC
-  = B.concat $ cbcEncHelper (padIV iv) (splitEvery 16 (padPkcs7 blocks))
+  = B.concat . cbcEncHelper (padIV iv) . splitEvery 16 . padPkcs7 $ blocks
   | modeOfOperation == CTR
   = undefined
   | otherwise
@@ -50,7 +50,7 @@ decryptStream modeOfOperation iv key keySize blocks
     . splitEvery 16
     $ blocks
   | modeOfOperation == CBC
-  = B.concat . unpadPkcs7 $ cbcDecHelper (padIV iv) (splitEvery 16 blocks)
+  = B.concat . unpadPkcs7 . cbcDecHelper (padIV iv) . splitEvery 16 $ blocks
   | modeOfOperation == CTR
   = undefined
   | otherwise
