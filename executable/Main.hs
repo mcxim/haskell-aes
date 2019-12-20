@@ -3,11 +3,11 @@
 -- wrote in their libraries.
 
 
-import           EncDec
+import           Encryption.EncDec
 import qualified System.IO                     as SIO
 import qualified Data.ByteString               as B
-import           Globals
-import           Utils
+import           Encryption.Globals
+import           Encryption.Utils
 
 
 main :: IO ()

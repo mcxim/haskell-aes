@@ -1,4 +1,4 @@
-module Globals where
+module Encryption.Globals where
 
 import           Data.Word8
 import           Crypto.Number.F2m

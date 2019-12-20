@@ -1,10 +1,10 @@
-module AddRoundKey
+module Encryption.AddRoundKey
   ( addRoundKey
   )
 where
 
-import           Globals
-import           Utils
+import           Encryption.Globals
+import           Encryption.Utils
 
 addRoundKey :: Key -> Block -> Block
 addRoundKey = bsXor

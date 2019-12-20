@@ -1,4 +1,4 @@
-module Utils where
+module Encryption.Utils where
 
 import qualified Data.ByteString               as B
 import qualified Data.Bits

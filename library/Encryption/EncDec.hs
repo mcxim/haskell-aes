@@ -1,12 +1,12 @@
-module EncDec where
+module Encryption.EncDec where
 
-import           ShiftRows
-import           AddRoundKey
-import           MixColumns
-import           SBox
-import           Globals
-import           Utils
-import           KeySchedule
+import           Encryption.ShiftRows
+import           Encryption.AddRoundKey
+import           Encryption.MixColumns
+import           Encryption.SBox
+import           Encryption.Globals
+import           Encryption.Utils
+import           Encryption.KeySchedule
 import qualified Data.ByteString               as B
 import qualified Data.Word8                    as W
 import           Data.Char                      ( ord )
