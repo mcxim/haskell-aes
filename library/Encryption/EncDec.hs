@@ -19,11 +19,11 @@ encryptStream
   -> KeySize
   -> BlockStream
   -> BlockStream
-encryptStream modeOfOperation iv key keySize blocks
+encryptStream modeOfOperation iv key keySize
   | modeOfOperation == ECB
-  = B.concat . map (encrypt subKeys keySize) . splitEvery 16 . padPkcs7 $ blocks
+  = B.concat . map (encrypt subKeys keySize) . splitEvery 16 . padPkcs7
   | modeOfOperation == CBC
-  = B.concat . cbcEncHelper (padIV iv) . splitEvery 16 . padPkcs7 $ blocks
+  = B.concat . cbcEncHelper (padIV iv) . splitEvery 16 . padPkcs7
   | otherwise
   = undefined
  where
@@ -40,15 +40,14 @@ decryptStream
   -> KeySize
   -> BlockStream
   -> BlockStream
-decryptStream modeOfOperation iv key keySize blocks
+decryptStream modeOfOperation iv key keySize 
   | modeOfOperation == ECB
   = B.concat
     . unpadPkcs7
     . map (decrypt subKeys keySize)
     . splitEvery 16
-    $ blocks
   | modeOfOperation == CBC
-  = B.concat . unpadPkcs7 . cbcDecHelper (padIV iv) . splitEvery 16 $ blocks
+  = B.concat . unpadPkcs7 . cbcDecHelper (padIV iv) . splitEvery 16
   | otherwise
   = undefined
  where
