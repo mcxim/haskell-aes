@@ -1,4 +1,4 @@
-module KeySchedule
+module Encryption.KeySchedule
   ( genSubKeys
   , testKS
   )
@@ -6,9 +6,9 @@ where
 
 
 import qualified Data.ByteString               as B
-import           Globals
-import           Utils
-import           SBox
+import           Encryption.Globals
+import           Encryption.Utils
+import           Encryption.SBox
 
 genSubKeys :: Key -> KeySize -> [SubKey]
 genSubKeys key KS128 =

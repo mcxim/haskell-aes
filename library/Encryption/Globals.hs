@@ -1,10 +1,10 @@
-module Globals where
+module Encryption.Globals where
 
 import           Data.Word8
 import           Crypto.Number.F2m
 import qualified Data.ByteString               as B
 
-data ModeOfOperation = ECB | CBC | CTR deriving (Show, Eq)
+data ModeOfOperation = ECB | CBC deriving (Show, Eq)
 
 data KeySize = KS128 | KS192 | KS256 deriving (Show, Eq)
 

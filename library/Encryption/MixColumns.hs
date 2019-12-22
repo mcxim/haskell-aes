@@ -1,11 +1,11 @@
-module MixColumns
+module Encryption.MixColumns
   ( mixColumns
   , invMixColumns
   )
 where
 
-import           Utils
-import           Globals
+import           Encryption.Utils
+import           Encryption.Globals
 import qualified Data.ByteString               as B
 import qualified Data.Word8                    as W
 import           Crypto.Number.F2m              ( mulF2m

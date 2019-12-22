@@ -1,12 +1,12 @@
-module EncDec where
+module Encryption.EncDec where
 
-import           ShiftRows
-import           AddRoundKey
-import           MixColumns
-import           SBox
-import           Globals
-import           Utils
-import           KeySchedule
+import           Encryption.ShiftRows
+import           Encryption.AddRoundKey
+import           Encryption.MixColumns
+import           Encryption.SBox
+import           Encryption.Globals
+import           Encryption.Utils
+import           Encryption.KeySchedule
 import qualified Data.ByteString               as B
 import qualified Data.Word8                    as W
 import           Data.Char                      ( ord )
@@ -24,8 +24,6 @@ encryptStream modeOfOperation iv key keySize blocks
   = B.concat . map (encrypt subKeys keySize) . splitEvery 16 . padPkcs7 $ blocks
   | modeOfOperation == CBC
   = B.concat . cbcEncHelper (padIV iv) . splitEvery 16 . padPkcs7 $ blocks
-  | modeOfOperation == CTR
-  = undefined
   | otherwise
   = undefined
  where
@@ -51,8 +49,6 @@ decryptStream modeOfOperation iv key keySize blocks
     $ blocks
   | modeOfOperation == CBC
   = B.concat . unpadPkcs7 . cbcDecHelper (padIV iv) . splitEvery 16 $ blocks
-  | modeOfOperation == CTR
-  = undefined
   | otherwise
   = undefined
  where

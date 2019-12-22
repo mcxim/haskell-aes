@@ -1,4 +1,4 @@
-module SBox
+module Encryption.SBox
   ( sBox
   , sBoxInv
   , subBytes
@@ -6,7 +6,7 @@ module SBox
   )
 where
 
-import           Globals
+import           Encryption.Globals
 import qualified Data.ByteString               as B
 
 subBytes :: Block -> Block

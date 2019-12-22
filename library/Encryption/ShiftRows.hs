@@ -1,12 +1,12 @@
-module ShiftRows
+module Encryption.ShiftRows
   ( shiftRows
   , invShiftRows
   )
 where
 
 import qualified Data.ByteString               as B
-import           Utils
-import           Globals
+import           Encryption.Utils
+import           Encryption.Globals
 
 shiftRows :: Block -> Block
 shiftRows = common rotWordLeft
