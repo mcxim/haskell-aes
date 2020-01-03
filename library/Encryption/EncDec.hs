@@ -40,12 +40,9 @@ decryptStream
   -> KeySize
   -> BlockStream
   -> BlockStream
-decryptStream modeOfOperation iv key keySize 
+decryptStream modeOfOperation iv key keySize
   | modeOfOperation == ECB
-  = B.concat
-    . unpadPkcs7
-    . map (decrypt subKeys keySize)
-    . splitEvery 16
+  = B.concat . unpadPkcs7 . map (decrypt subKeys keySize) . splitEvery 16
   | modeOfOperation == CBC
   = B.concat . unpadPkcs7 . cbcDecHelper (padIV iv) . splitEvery 16
   | otherwise
