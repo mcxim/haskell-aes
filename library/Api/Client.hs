@@ -16,6 +16,11 @@ import           Servant.API
 import           Servant.Types.SourceT          ( foreach )
 
 
+run :: ClientM a -> IO (Either ClientError a)
+run query = do
+  manager' <- newManager defaultManagerSettings
+  runClientM query (mkClientEnv manager' (BaseUrl Http "localhost" 5000 ""))
+
 type Username = String
 type Userdata = String -- b64 encoded
 
@@ -23,7 +28,6 @@ data User = User {username :: Username, userdata :: Userdata} deriving (Show, Ge
 
 instance ToJSON User where
   toJSON (User un ud) = object ["username" .= un, "data" .= ud]
-
 
 data UserWId = UserWId {username' :: Username, userdata' :: Userdata, uid :: Int}
   deriving (Show, Generic)
@@ -34,7 +38,6 @@ instance FromJSON UserWId where
     ud  <- obj .: "data"
     id' <- obj .: "id"
     return UserWId { username' = un, userdata' = ud, uid = id' }
-
 
 type API = "user" :> (
             Get '[JSON] [UserWId]
@@ -47,28 +50,26 @@ type API = "user" :> (
 api :: Proxy API
 api = Proxy
 
-getUserById :: Int -> ClientM UserWId
-getUsers :: ClientM [UserWId]
-postUser :: User -> ClientM UserWId
-putUser :: User -> ClientM UserWId
-deleteUser :: Int -> ClientM UserWId
-getUsers :<|> getUserById :<|> postUser :<|> putUser :<|> deleteUser =
+getUserById' :: Int -> ClientM UserWId
+getUsers' :: ClientM [UserWId]
+postUser' :: User -> ClientM UserWId
+putUser' :: User -> ClientM UserWId
+deleteUser' :: Int -> ClientM UserWId
+getUsers' :<|> getUserById' :<|> postUser' :<|> putUser' :<|> deleteUser' =
   client api
 
-post = postUser (User "find me" "somebodytolove")
-getall = getUsers
-get = getUserById 3
+getUsers = run getUsers'
+getUserById = run . getUserById'
+postUser = run . postUser'
+putUser = run . putUser'
+deleteUser = run . deleteUser'
 
 
-run :: IO ()
-run = do
-  manager' <- newManager defaultManagerSettings
-  res <- runClientM get
-                    (mkClientEnv manager' (BaseUrl Http "localhost" 5000 ""))
-  case res of
-    Left  err  -> putStrLn $ "Error: " ++ show err
-    Right user -> print user
+data Entry = Entry {site :: String, name :: String, pass :: String} deriving (Show, Generic)
 
+instance ToJSON Entry
+
+instance FromJSON Entry
 
 
 -- test :: IO ()
