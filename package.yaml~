@@ -28,12 +28,6 @@ library:
   - bytestring-conversion
   - cryptonite
   - ghc
-  - base64-bytestring
-  - aeson
-  - http-client
-  - servant
-  - servant-client
-  - text
   source-dirs: library
 
 executables:
