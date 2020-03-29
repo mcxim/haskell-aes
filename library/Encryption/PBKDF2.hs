@@ -1,6 +1,6 @@
 module Encryption.PBKDF2 where
 
-import qualified Data.ByteString               as B
+import qualified Data.ByteString.Lazy               as B
 import           Encryption.Utils
 
 -- fFunc :: String -> String -> Int -> Int -> B.ByteString

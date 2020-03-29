@@ -2,7 +2,8 @@ module Encryption.Globals where
 
 import           Data.Word8
 import           Crypto.Number.F2m
-import qualified Data.ByteString               as B
+import qualified Data.ByteString.Lazy               as B
+import GHC.Int (Int64)
 
 data ModeOfOperation = ECB | CBC deriving (Show, Eq)
 
@@ -29,7 +30,7 @@ numRounds KS128 = 10
 numRounds KS192 = 12
 numRounds KS256 = 14
 
-getKeySize :: KeySize -> Int
+getKeySize :: KeySize -> Int64
 getKeySize KS128 = 16
 getKeySize KS192 = 24
 getKeySize KS256 = 32

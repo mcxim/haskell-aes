@@ -7,7 +7,7 @@ module Encryption.SBox
 where
 
 import           Encryption.Globals
-import qualified Data.ByteString               as B
+import qualified Data.ByteString.Lazy               as B
 
 subBytes :: Block -> Block
 subBytes = B.map sBox

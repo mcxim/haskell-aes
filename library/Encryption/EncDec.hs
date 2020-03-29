@@ -7,7 +7,7 @@ import           Encryption.SBox
 import           Encryption.Globals
 import           Encryption.Utils
 import           Encryption.KeySchedule
-import qualified Data.ByteString               as B
+import qualified Data.ByteString.Lazy               as B
 import qualified Data.Word8                    as W
 import           Data.Char                      ( ord )
 import           Debug.Trace                    ( trace )

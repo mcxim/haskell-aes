@@ -2,9 +2,11 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Api.Client where
 
+import qualified Data.Text                     as T
 import           Data.Aeson
 import           Data.Proxy
 import           GHC.Generics
@@ -13,7 +15,14 @@ import           Network.HTTP.Client            ( newManager
                                                 )
 import           Servant.Client
 import           Servant.API
-import           Servant.Types.SourceT          ( foreach )
+import qualified System.IO                     as SIO
+import qualified Encryption.Utils              as EU
+import qualified Data.ByteString               as B
+import qualified Data.ByteString.Lazy.UTF8     as BLU
+import qualified Data.ByteString.Base64.Lazy   as B64
+import qualified Data.Maybe                    as DM
+import qualified Debug.Trace                   as DT
+import           Encryption.EncDec
 
 
 run :: ClientM a -> IO (Either ClientError a)
@@ -24,12 +33,12 @@ run query = do
 type Username = String
 type Userdata = String -- b64 encoded
 
-data User = User {username :: Username, userdata :: Userdata} deriving (Show, Generic)
+data User = User {getUsername :: Username, getData :: Userdata} deriving (Show, Generic)
 
 instance ToJSON User where
   toJSON (User un ud) = object ["username" .= un, "data" .= ud]
 
-data UserWId = UserWId {username' :: Username, userdata' :: Userdata, uid :: Int}
+data UserWId = UserWId {getUsername' :: Username, getData' :: Userdata, getId :: Int}
   deriving (Show, Generic)
 
 instance FromJSON UserWId where
@@ -37,7 +46,7 @@ instance FromJSON UserWId where
     un  <- obj .: "username"
     ud  <- obj .: "data"
     id' <- obj .: "id"
-    return UserWId { username' = un, userdata' = ud, uid = id' }
+    return (UserWId un ud id')
 
 type API = "user" :> (
             Get '[JSON] [UserWId]
@@ -65,11 +74,32 @@ putUser = run . putUser'
 deleteUser = run . deleteUser'
 
 
-data Entry = Entry {site :: String, name :: String, pass :: String} deriving (Show, Generic)
+data Entry = Entry {site :: String, name :: String, pass :: String}
+  deriving (Show, Generic)
 
 instance ToJSON Entry
 
 instance FromJSON Entry
+
+type Password = String
+
+getDataById :: Int -> Password -> IO (Either String [Entry])
+getDataById id password =
+  getUserById id
+    >>= (\case
+          Left err -> return . Left $ show err
+          Right (UserWId _ data' _) ->
+            case B64.decode (BLU.fromString data') of
+              Left  err     -> return . Left $ err
+              Right encoded -> case decode encoded of
+                Nothing      -> return . Left $ "Error: decoding error."
+                Just entries -> return . Right $ entries
+        )
+
+-- DM.fromMaybe "Error: decoding error." (decode encoded :: [Entry])
+  -- B64.decode userdata' $ getUserById id
+
+
 
 
 -- test :: IO ()

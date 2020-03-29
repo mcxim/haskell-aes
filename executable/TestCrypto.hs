@@ -2,7 +2,7 @@ module TestCrypto where
 
 import           Encryption.EncDec
 import qualified System.IO                     as SIO
-import qualified Data.ByteString               as B
+import qualified Data.ByteString.Lazy               as B
 import           Encryption.Globals
 import           Encryption.Utils
 

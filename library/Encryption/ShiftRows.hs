@@ -4,7 +4,7 @@ module Encryption.ShiftRows
   )
 where
 
-import qualified Data.ByteString               as B
+import qualified Data.ByteString.Lazy               as B
 import           Encryption.Utils
 import           Encryption.Globals
 

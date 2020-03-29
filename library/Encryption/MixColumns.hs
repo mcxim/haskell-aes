@@ -6,7 +6,7 @@ where
 
 import           Encryption.Utils
 import           Encryption.Globals
-import qualified Data.ByteString               as B
+import qualified Data.ByteString.Lazy               as B
 import qualified Data.Word8                    as W
 import           Crypto.Number.F2m              ( mulF2m
                                                 , addF2m
