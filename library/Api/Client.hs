@@ -6,7 +6,6 @@
 
 module Api.Client where
 
-import qualified Data.Text                     as T
 import           Data.Aeson
 import           Data.Proxy
 import           GHC.Generics
@@ -17,12 +16,12 @@ import           Servant.Client
 import           Servant.API
 import qualified System.IO                     as SIO
 import qualified Encryption.Utils              as EU
-import qualified Data.ByteString               as B
+import qualified Data.ByteString.Lazy          as B
 import qualified Data.ByteString.Lazy.UTF8     as BLU
 import qualified Data.ByteString.Base64.Lazy   as B64
-import qualified Data.Maybe                    as DM
 import qualified Debug.Trace                   as DT
-import           Encryption.EncDec
+import qualified Encryption.EncDec             as ED
+import qualified Encryption.Globals            as EG
 
 
 run :: ClientM a -> IO (Either ClientError a)
@@ -67,10 +66,15 @@ deleteUser' :: Int -> ClientM UserWId
 getUsers' :<|> getUserById' :<|> postUser' :<|> putUser' :<|> deleteUser' =
   client api
 
+getUsers :: IO (Either ClientError [UserWId])
 getUsers = run getUsers'
+getUserById :: Int -> IO (Either ClientError UserWId)
 getUserById = run . getUserById'
+postUser :: User -> IO (Either ClientError UserWId)
 postUser = run . postUser'
+putUser :: User -> IO (Either ClientError UserWId)
 putUser = run . putUser'
+deleteUser :: Int -> IO (Either ClientError UserWId)
 deleteUser = run . deleteUser'
 
 
@@ -81,36 +85,34 @@ instance ToJSON Entry
 
 instance FromJSON Entry
 
-type Password = String
+getDataById
+  :: Int -> EG.Key -> EG.InitializationVector -> IO (Either String [Entry])
+getDataById id' key iv = do
+  user <- getUserById id'
+  return $ case user of
+    Left err -> Left $ show err
+    Right (UserWId _ encodedData _) ->
+      let encrypted = B64.decode (BLU.fromString encodedData)
+      in  case encrypted of
+            Left err -> Left err
+            Right encoded ->
+              let decrypted = ED.decryptStream EG.CBC iv key EG.KS256 encoded
+              in  case decode decrypted of
+                    Nothing      -> Left "Error: decoding error."
+                    Just entries -> Right entries
 
-getDataById :: Int -> Password -> IO (Either String [Entry])
-getDataById id password =
-  getUserById id
-    >>= (\case
-          Left err -> return . Left $ show err
-          Right (UserWId _ data' _) ->
-            case B64.decode (BLU.fromString data') of
-              Left  err     -> return . Left $ err
-              Right encoded -> case decode encoded of
-                Nothing      -> return . Left $ "Error: decoding error."
-                Just entries -> return . Right $ entries
-        )
+encryptData :: [Entry] -> EG.Key -> EG.InitializationVector -> B.ByteString
+encryptData = undefined
 
--- DM.fromMaybe "Error: decoding error." (decode encoded :: [Entry])
-  -- B64.decode userdata' $ getUserById id
-
-
-
-
--- test :: IO ()
--- test = do
---   fhandle  <- SIO.openFile "key.txt" SIO.ReadMode
---   contents <- B.hGetContents fhandle
---   EU.printBS contents
---   print contents
---   let encoded = B64.encode contents
---   EU.printBS encoded
---   print encoded
---   let decoded = B64.decode encoded
---   print decoded
---   return ()
+testB64 :: IO ()
+testB64 = do
+  fhandle  <- SIO.openFile "result.txt" SIO.ReadMode
+  contents <- B.hGetContents fhandle
+  EU.printBS contents
+  print contents
+  let encoded = B64.encode contents
+  EU.printBS encoded
+  print encoded
+  let decoded = B64.decode encoded
+  print decoded
+  return ()
