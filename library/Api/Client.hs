@@ -113,11 +113,8 @@ encryptData key iv =
   BLU.toString
     . B64.encode
     . ED.encryptStream EG.CBC iv key EG.KS256
-    . flip B.append (B.pack [99, 104, 101, 99, 107])
+    . B.append (B.pack [99, 104, 101, 99, 107])
     . J.encode
-
-changeName :: Int -> String -> IO (Either ClientError UserWId)
-changeName id' newName = putUser id' (User newName " ")
 
 addEntries
   :: Int
@@ -136,6 +133,9 @@ addEntries id' key iv entriesToAdd = do
         Left  err  -> return . Left . show $ err
         Right user -> return . Right $ user
 
+
+changeName :: Int -> String -> IO (Either ClientError UserWId)
+changeName id' newName = putUser id' (User newName " ")
 
 
 testB64 :: IO ()

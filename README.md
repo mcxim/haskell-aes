@@ -1,5 +1,5 @@
 # [haskell-aes][]
 
-An implementation of the AES / Rijndael algorithm in haskell.
+The client of my password manager, work in progress.
 
-[haskell-aes]: https://github.com/mcxim/haskell-aes
+[mcferrin]: https://github.com/mcxim/mcferrin
