@@ -57,24 +57,28 @@ type API = "user" :> (
 api :: Proxy API
 api = Proxy
 
-getUserById' :: Int -> ClientM UserWId
 getUsers' :: ClientM [UserWId]
+getUserById' :: Int -> ClientM UserWId
 postUser' :: User -> ClientM UserWId
 putUser' :: Int -> User -> ClientM UserWId
 deleteUser' :: Int -> ClientM UserWId
 getUsers' :<|> getUserById' :<|> postUser' :<|> putUser' :<|> deleteUser' =
   client api
 
-getUsers :: IO (Either ClientError [UserWId])
-getUsers = run getUsers'
-getUserById :: Int -> IO (Either ClientError UserWId)
-getUserById = run . getUserById'
-postUser :: User -> IO (Either ClientError UserWId)
-postUser = run . postUser'
-putUser :: Int -> User -> IO (Either ClientError UserWId)
-putUser i u = run $ putUser' i u
-deleteUser :: Int -> IO (Either ClientError UserWId)
-deleteUser = run . deleteUser'
+showError :: Either ClientError a -> Either String a
+showError (Left  err) = Left $ show err
+showError (Right val) = Right val
+
+getUsers :: IO (Either String [UserWId])
+getUsers = showError <$> run getUsers'
+getUserById :: Int -> IO (Either String UserWId)
+getUserById id' = showError <$> run (getUserById' id')
+postUser :: User -> IO (Either String UserWId)
+postUser user = showError <$> run (postUser' user)
+putUser :: Int -> User -> IO (Either String UserWId)
+putUser i u = showError <$> run (putUser' i u)
+deleteUser :: Int -> IO (Either String UserWId)
+deleteUser id' = showError <$> run (deleteUser' id')
 
 
 data Entry = Entry {site :: String, name :: String, pass :: String}
@@ -101,12 +105,8 @@ decryptData key iv data' =
 
 getDataById
   :: Int -> EG.Key -> EG.InitializationVector -> IO (Either String [Entry])
-getDataById id' key iv = do
-  user <- getUserById id'
-  return $ case user of
-    Left  err                       -> Left $ show err
-    Right (UserWId _ encodedData _) -> decryptData key iv encodedData
-
+getDataById id' key iv =
+  (>>= decryptData key iv) . fmap getData' <$> getUserById id'
 
 encryptData :: EG.Key -> EG.InitializationVector -> [Entry] -> String
 encryptData key iv =
@@ -127,14 +127,15 @@ addEntries id' key iv entriesToAdd = do
   case res of
     Left  err     -> return $ Left err
     Right entries -> do
-      res' <- putUser id'
-                      (User " " (encryptData key iv (entries ++ entriesToAdd)))
+      res' <- putUser
+        id'
+        (User " " (encryptData key iv (entries ++ entriesToAdd)))
       case res' of
         Left  err  -> return . Left . show $ err
         Right user -> return . Right $ user
 
 
-changeName :: Int -> String -> IO (Either ClientError UserWId)
+changeName :: Int -> String -> IO (Either String UserWId)
 changeName id' newName = putUser id' (User newName " ")
 
 
