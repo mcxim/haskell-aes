@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Api.Client where
 
@@ -90,18 +91,15 @@ instance J.FromJSON Entry
 
 decryptData
   :: EG.Key -> EG.InitializationVector -> String -> Either String [Entry]
-decryptData key iv data' =
-  let encrypted = B64.decode (BLU.fromString data')
-  in  case encrypted of
-        Left err -> Left err
-        Right decryptMe ->
-          let decrypted     = ED.decryptStream EG.CBC iv key EG.KS256 decryptMe
-              (check, rest) = B.splitAt 5 decrypted
-          in  if check /= B.pack [99, 104, 101, 99, 107]
-                then Left "Error: Decryption failed."
-                else case J.decode rest of
-                  Nothing      -> Left "Error: JSON decoding error."
-                  Just entries -> Right entries
+decryptData key iv data' = do
+  encrypted <- B64.decode (BLU.fromString data')
+  let (check, rest) =
+        B.splitAt 5 $ ED.decryptStream EG.CBC iv key EG.KS256 encrypted
+  if check /= B.pack [99, 104, 101, 99, 107]
+    then Left "Error: Decryption failed."
+    else case J.decode rest of
+      Nothing      -> Left "Error: JSON decoding error."
+      Just entries -> Right entries
 
 getDataById
   :: Int -> EG.Key -> EG.InitializationVector -> IO (Either String [Entry])
@@ -122,17 +120,10 @@ addEntries
   -> EG.InitializationVector
   -> [Entry]
   -> IO (Either String UserWId)
-addEntries id' key iv entriesToAdd = do
-  res <- getDataById 1 key iv
-  case res of
-    Left  err     -> return $ Left err
-    Right entries -> do
-      res' <- putUser
-        id'
-        (User " " (encryptData key iv (entries ++ entriesToAdd)))
-      case res' of
-        Left  err  -> return . Left . show $ err
-        Right user -> return . Right $ user
+addEntries id' key iv entriesToAdd = getDataById 1 key iv >>= \case
+  Left err -> return $ Left err
+  Right entries ->
+    putUser id' (User " " (encryptData key iv (entries ++ entriesToAdd)))
 
 
 changeName :: Int -> String -> IO (Either String UserWId)
