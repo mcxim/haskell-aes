@@ -6,7 +6,17 @@
 
 module Api.Client where
 
-import qualified Data.Aeson                    as J
+import           Data.Aeson                     ( object
+                                                , withObject
+                                                , ToJSON
+                                                , FromJSON
+                                                , (.:)
+                                                , (.=)
+                                                , encode
+                                                , decode
+                                                , parseJSON
+                                                , toJSON
+                                                )
 import           Data.Proxy
 import           GHC.Generics
 import           Network.HTTP.Client            ( newManager
@@ -32,62 +42,102 @@ run query = do
 type Username = String
 type Userdata = String -- b64 encoded
 
-data User = User {getUsername :: Username, getData :: Userdata} deriving (Show, Generic)
+data User = User {_username :: Username, _userdata :: Userdata} deriving (Show, Generic)
 
-instance J.ToJSON User where
-  toJSON (User un ud) = J.object ["username" J..= un, "data" J..= ud]
+instance ToJSON User where
+  toJSON (User un ud) = object ["username" .= un, "data" .= ud]
 
-data UserWId = UserWId {getUsername' :: Username, getData' :: Userdata, getId :: Int}
+data UserSchema = UserSchema {__username :: Username, __userdata :: Userdata, __id :: Int}
   deriving (Show, Generic)
 
-instance J.FromJSON UserWId where
-  parseJSON = J.withObject "UserWId" $ \obj -> do
-    un  <- obj J..: "username"
-    ud  <- obj J..: "data"
-    id' <- obj J..: "id"
-    return (UserWId un ud id')
+instance FromJSON UserSchema where
+  parseJSON = withObject "UserSchema" $ \obj -> do
+    un  <- obj .: "username"
+    ud  <- obj .: "data"
+    id' <- obj .: "id"
+    return (UserSchema un ud id')
 
-type API = "user" :> (
-            Get '[JSON] [UserWId]
-      :<|>  Capture "userid" Int :> Get '[JSON] UserWId
-      :<|>  ReqBody '[JSON] User :> Post '[JSON] UserWId
-      :<|>  Capture "userid" Int :> ReqBody '[JSON] User :> PutAccepted '[JSON] UserWId
-      :<|>  Capture "userid" Int :> DeleteAccepted '[JSON] UserWId
-      )
+newtype TokenInJSON = TokenInJSON String deriving (Show, Generic)
+
+instance FromJSON TokenInJSON where
+  parseJSON = withObject "TokenInJSON" $ \obj -> do
+    t <- obj .: "token"
+    return (TokenInJSON t)
+
+data Credentials = Credentials String String
+
+instance FromJSON Credentials where
+  parseJSON = withObject "Credentials" $ \obj -> do
+    username <- obj .: "username"
+    password <- obj .: "password"
+    return (Credentials username password)
+
+instance ToJSON Credentials where
+  toJSON (Credentials username password) =
+    object ["username" .= username, "password" .= password]
+
+type Token = String
+
+type API = "register" :> ReqBody '[JSON] Credentials :> PostCreated '[JSON] UserSchema
+      :<|> "login" :>  Header "Authorization" String :> Get '[JSON] TokenInJSON
+      :<|> "user" :> (
+                               Header "x-access-tokens" Token :>                                  Get '[JSON] UserSchema
+                :<|> "data" :> Header "x-access-tokens" Token :>                                  Get '[PlainText] String
+                :<|> "data" :> Header "x-access-tokens" Token :> ReqBody '[PlainText] Userdata :> Put '[PlainText] String
+                :<|>           Header "x-access-tokens" Token :>                                  DeleteNoContent '[PlainText] NoContent
+           ) 
 
 api :: Proxy API
 api = Proxy
 
-getUsers' :: ClientM [UserWId]
-getUserById' :: Int -> ClientM UserWId
-postUser' :: User -> ClientM UserWId
-putUser' :: Int -> User -> ClientM UserWId
-deleteUser' :: Int -> ClientM UserWId
-getUsers' :<|> getUserById' :<|> postUser' :<|> putUser' :<|> deleteUser' =
-  client api
+registerHandler :: Credentials -> ClientM UserSchema
+loginHandler :: Maybe Token -> ClientM TokenInJSON
+getAllHandler :: Maybe Token -> ClientM UserSchema
+getVaultHandler :: Maybe Token -> ClientM String
+putVaultHandler :: Maybe Token -> Userdata -> ClientM String
+deleteUserHandler :: Maybe Token -> ClientM NoContent
+registerHandler :<|> loginHandler :<|> (getAllHandler :<|> getVaultHandler :<|> putVaultHandler :<|> deleteUserHandler)
+  = client api
 
 showError :: Either ClientError a -> Either String a
 showError (Left  err) = Left $ show err
 showError (Right val) = Right val
 
-getUsers :: IO (Either String [UserWId])
-getUsers = showError <$> run getUsers'
-getUserById :: Int -> IO (Either String UserWId)
-getUserById id' = showError <$> run (getUserById' id')
-postUser :: User -> IO (Either String UserWId)
-postUser user = showError <$> run (postUser' user)
-putUser :: Int -> User -> IO (Either String UserWId)
-putUser i u = showError <$> run (putUser' i u)
-deleteUser :: Int -> IO (Either String UserWId)
-deleteUser id' = showError <$> run (deleteUser' id')
+register :: Credentials -> IO (Either String UserSchema)
+register = fmap showError . run . registerHandler
+
+login :: String -> String -> IO (Either String TokenInJSON)
+login username password =
+  fmap showError
+    .  run
+    .  loginHandler
+    .  Just
+    .  ("Basic " <>)
+    .  BLU.toString
+    .  B64.encode
+    .  BLU.fromString
+    $  username
+    <> ":"
+    <> password
+
+getAll :: Token -> IO (Either String UserSchema)
+getAll = fmap showError . run . getAllHandler . Just
+
+getVault :: Token -> IO (Either String String)
+getVault = fmap showError . run . getVaultHandler . Just
+
+putVault :: Token -> Userdata -> IO (Either String String)
+putVault token = fmap showError . run . putVaultHandler (Just token)
+
+deleteUser = fmap showError . run . deleteUserHandler . Just
 
 
 data Entry = Entry {site :: String, name :: String, pass :: String}
   deriving (Show, Generic)
 
-instance J.ToJSON Entry
+instance ToJSON Entry
 
-instance J.FromJSON Entry
+instance FromJSON Entry
 
 decryptData
   :: EG.Key -> EG.InitializationVector -> String -> Either String [Entry]
@@ -97,14 +147,13 @@ decryptData key iv data' = do
         B.splitAt 5 $ ED.decryptStream EG.CBC iv key EG.KS256 encrypted
   if check /= B.pack [99, 104, 101, 99, 107]
     then Left "Error: Decryption failed."
-    else case J.decode rest of
+    else case decode rest of
       Nothing      -> Left "Error: JSON decoding error."
       Just entries -> Right entries
 
-getDataById
-  :: Int -> EG.Key -> EG.InitializationVector -> IO (Either String [Entry])
-getDataById id' key iv =
-  (>>= decryptData key iv) . fmap getData' <$> getUserById id'
+getData
+  :: Token -> EG.Key -> EG.InitializationVector -> IO (Either String [Entry])
+getData token key iv = (>>= decryptData key iv) <$> getVault token
 
 encryptData :: EG.Key -> EG.InitializationVector -> [Entry] -> String
 encryptData key iv =
@@ -112,22 +161,27 @@ encryptData key iv =
     . B64.encode
     . ED.encryptStream EG.CBC iv key EG.KS256
     . B.append (B.pack [99, 104, 101, 99, 107])
-    . J.encode
+    . encode
 
-addEntries
-  :: Int
-  -> EG.Key
-  -> EG.InitializationVector
-  -> [Entry]
-  -> IO (Either String UserWId)
-addEntries id' key iv entriesToAdd = getDataById 1 key iv >>= \case
+putData :: Token -> EG.Key -> EG.InitializationVector -> [Entry] -> IO (Either String String)
+putData token key iv entriesToAdd = getData token key iv >>= \case
   Left err -> return $ Left err
-  Right entries ->
-    putUser id' (User " " (encryptData key iv (entries ++ entriesToAdd)))
+  Right entries -> putVault token (encryptData key iv (entries <> entriesToAdd))
+
+-- addEntries
+--   :: Int
+--   -> EG.Key
+--   -> EG.InitializationVector
+--   -> [Entry]
+--   -> IO (Either String UserSchema)
+-- addEntries id' key iv entriesToAdd = getDataById 1 key iv >>= \case
+--   Left err -> return $ Left err
+--   Right entries ->
+--     putUser id' (User " " (encryptData key iv (entries ++ entriesToAdd)))
 
 
-changeName :: Int -> String -> IO (Either String UserWId)
-changeName id' newName = putUser id' (User newName " ")
+-- changeName :: Int -> String -> IO (Either String UserSchema)
+-- changeName id' newName = putUser id' (User newName " ")
 
 
 testB64 :: IO ()

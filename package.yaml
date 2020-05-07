@@ -26,9 +26,10 @@ library:
   - word8
   - bytestring
   - bytestring-conversion
-  - cryptonite
+  - yesod-auth
   - ghc
   - base64-bytestring
+  - cryptonite
   - aeson
   - http-client
   - servant

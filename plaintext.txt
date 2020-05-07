@@ -1,1 +1,1 @@
-check[{"site": "facebook.com", "name": "mcxim", "pass": "PASS"}, {"site": "facebook.com", "name": "mcxim", "pass": "PASS"}]
+check[]
