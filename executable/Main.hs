@@ -42,11 +42,9 @@ withEcho echo action = do
   old <- hGetEcho stdin
   bracket_ (hSetEcho stdin echo) (hSetEcho stdin old) action
 
-
 genVaultKey :: String -> String -> B.ByteString
 genVaultKey master username =
   PS.pbkdf2 (BSU.fromString master) (PS.makeSalt (zfill 8 (BSU.fromString username))) 100100
-
 
 genLoginHash' :: String -> String -> B.ByteString
 genLoginHash' master username =

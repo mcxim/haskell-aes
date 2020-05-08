@@ -8,7 +8,7 @@ import Test.Tasty.Hspec
 
 main :: IO ()
 main = do
-    test <- testSpec "haskell-aes" spec
+    test <- testSpec "mcferrin" spec
     Test.Tasty.defaultMain test
 
 spec :: Spec

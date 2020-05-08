@@ -29,7 +29,8 @@ library:
   - yesod-auth
   - ghc
   - base64-bytestring
-  - cryptonite
+  - crypto-api
+  - crypto-numbers
   - aeson
   - http-client
   - servant

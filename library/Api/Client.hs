@@ -24,12 +24,12 @@ import           Network.HTTP.Client            ( newManager
                                                 )
 import           Servant.Client
 import           Servant.API
+import           Servant.API.ContentTypes       ( NoContent )
 import qualified System.IO                     as SIO
 import qualified Encryption.Utils              as EU
 import qualified Data.ByteString.Lazy          as B
 import qualified Data.ByteString.Lazy.UTF8     as BLU
 import qualified Data.ByteString.Base64.Lazy   as B64
--- import qualified Debug.Trace                   as DT
 import qualified Encryption.EncDec             as ED
 import qualified Encryption.Globals            as EG
 
@@ -129,6 +129,7 @@ getVault = fmap showError . run . getVaultHandler . Just
 putVault :: Token -> Userdata -> IO (Either String String)
 putVault token = fmap showError . run . putVaultHandler (Just token)
 
+deleteUser :: Token -> IO (Either String NoContent)
 deleteUser = fmap showError . run . deleteUserHandler . Just
 
 
@@ -139,34 +140,30 @@ instance ToJSON Entry
 
 instance FromJSON Entry
 
-decryptData
-  :: EG.Key -> EG.InitializationVector -> String -> Either String [Entry]
-decryptData key iv data' = do
+decryptData :: EG.Key -> String -> Either String [Entry]
+decryptData key data' = do
   encrypted <- B64.decode (BLU.fromString data')
   let (check, rest) =
-        B.splitAt 5 $ ED.decryptStream EG.CBC iv key EG.KS256 encrypted
+        B.splitAt 5 $ ED.decryptStream EG.CBC key EG.KS256 encrypted
   if check /= B.pack [99, 104, 101, 99, 107]
     then Left "Error: Decryption failed."
     else case decode rest of
       Nothing      -> Left "Error: JSON decoding error."
       Just entries -> Right entries
 
-getData
-  :: Token -> EG.Key -> EG.InitializationVector -> IO (Either String [Entry])
-getData token key iv = (>>= decryptData key iv) <$> getVault token
+getData :: Token -> EG.Key -> IO (Either String [Entry])
+getData token key = (>>= decryptData key) <$> getVault token
 
-encryptData :: EG.Key -> EG.InitializationVector -> [Entry] -> String
-encryptData key iv =
-  BLU.toString
-    . B64.encode
-    . ED.encryptStream EG.CBC iv key EG.KS256
-    . B.append (B.pack [99, 104, 101, 99, 107])
-    . encode
+encryptData :: EG.Key -> [Entry] -> IO String
+encryptData key entries = BLU.toString . B64.encode <$> ED.encryptRandomCBC
+  key
+  EG.KS256
+  (B.append (B.pack [99, 104, 101, 99, 107]) . encode $ entries)
 
-putData :: Token -> EG.Key -> EG.InitializationVector -> [Entry] -> IO (Either String String)
-putData token key iv entriesToAdd = getData token key iv >>= \case
-  Left err -> return $ Left err
-  Right entries -> putVault token (encryptData key iv (entries <> entriesToAdd))
+putData :: Token -> EG.Key -> [Entry] -> IO (Either String String)
+putData token key entriesToAdd = getData token key >>= \case
+  Left  err     -> return $ Left err
+  Right entries -> encryptData key (entries <> entriesToAdd) >>= putVault token
 
 -- addEntries
 --   :: Int

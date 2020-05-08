@@ -7,10 +7,13 @@ import           Encryption.SBox
 import           Encryption.Globals
 import           Encryption.Utils
 import           Encryption.KeySchedule
-import qualified Data.ByteString.Lazy               as B
+import qualified Data.ByteString.Lazy          as B
 import qualified Data.Word8                    as W
 import           Data.Char                      ( ord )
-import           Debug.Trace                    ( trace )
+import           Crypto.Classes.Exceptions      ( newGenIO )
+import           Crypto.Random                  ( genBytes
+                                                , SystemRandom
+                                                )
 
 encryptStream
   :: ModeOfOperation
@@ -23,7 +26,11 @@ encryptStream modeOfOperation iv key keySize
   | modeOfOperation == ECB
   = B.concat . map (encrypt subKeys keySize) . splitEvery 16 . padPkcs7
   | modeOfOperation == CBC
-  = B.concat . cbcEncHelper (padIV iv) . splitEvery 16 . padPkcs7
+  = B.concat
+    . (pure (padIV iv) <>)
+    . cbcEncHelper (padIV iv)
+    . splitEvery 16
+    . padPkcs7
   | otherwise
   = undefined
  where
@@ -33,18 +40,27 @@ encryptStream modeOfOperation iv key keySize
   cbcEncHelper prevBlock (block : blocks) = result : cbcEncHelper result blocks
     where result = encrypt subKeys keySize (block `bsXor` prevBlock)
 
-decryptStream
-  :: ModeOfOperation
-  -> InitializationVector
-  -> Key
-  -> KeySize
-  -> BlockStream
-  -> BlockStream
-decryptStream modeOfOperation iv key keySize
+encryptRandomCBC :: Key -> KeySize -> BlockStream -> IO BlockStream
+encryptRandomCBC key keySize blockstream = do
+  g  <- newGenIO :: IO SystemRandom
+  iv <- case genBytes 16 g of
+    Left  err          -> error $ show err
+    Right (result, g2) -> return result
+  return $ encryptStream CBC (B.fromStrict iv) key keySize blockstream
+
+
+decryptStream -- TODO get iv from ct
+  :: ModeOfOperation -> Key -> KeySize -> BlockStream -> BlockStream
+decryptStream modeOfOperation key keySize blockstream
   | modeOfOperation == ECB
-  = B.concat . unpadPkcs7 . map (decrypt subKeys keySize) . splitEvery 16
+  = B.concat
+    . unpadPkcs7
+    . map (decrypt subKeys keySize)
+    . splitEvery 16
+    $ blockstream
   | modeOfOperation == CBC
-  = B.concat . unpadPkcs7 . cbcDecHelper (padIV iv) . splitEvery 16
+  = let (iv : blockstream') = splitEvery 16 blockstream
+    in  B.concat . unpadPkcs7 . cbcDecHelper (padIV iv) $ blockstream'
   | otherwise
   = undefined
  where
@@ -89,7 +105,8 @@ toByte = fromIntegral . ord
 
 padPkcs7 :: BlockStream -> BlockStream
 padPkcs7 blocks = blocks `B.append` B.replicate padNum (fromIntegral padNum)
-  where padNum = 16 - (B.length blocks `mod` 16)
+ where
+  padNum = let n = 16 - (B.length blocks `mod` 16) in if n == 0 then 16 else n
 
 unpadPkcs7 :: [Block] -> [Block]
 unpadPkcs7 blocks =

@@ -1,7 +1,6 @@
 module Encryption.Globals where
 
 import           Data.Word8
-import           Crypto.Number.F2m
 import qualified Data.ByteString.Lazy               as B
 import GHC.Int (Int64)
 
@@ -36,9 +35,6 @@ getKeySize KS192 = 24
 getKeySize KS256 = 32
 
 aesPolynomial = 0x11B -- x^8+x^4+x^3+x+1 -> 100011011 -> 0x11B
-
-mulPolynomial :: Integer -> Integer -> Integer
-mulPolynomial = mulF2m aesPolynomial
 
 sampleKey =
   B.pack
