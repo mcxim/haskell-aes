@@ -25,13 +25,11 @@ import           GHC.Generics
 import           Network.HTTP.Client            ( newManager
                                                 , defaultManagerSettings
                                                 )
-import qualified Network.HTTP.Media            as M
 import           Servant.Client
 import           Servant.API
 import           Servant.API.ContentTypes       ( NoContent )
 import qualified System.IO                     as SIO
 import qualified Encryption.Utils              as EU
--- import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy          as B
 import qualified Data.ByteString.Lazy.UTF8     as BLU
 import qualified Data.ByteString.Base64.Lazy   as B64
@@ -62,7 +60,7 @@ instance FromJSON UserSchema where
     id' <- obj .: "id"
     return (UserSchema un ud id')
 
-newtype TokenInJSON = TokenInJSON String deriving (Show, Generic)
+newtype TokenInJSON = TokenInJSON {getTokenInJSON :: String} deriving (Show, Generic)
 
 instance FromJSON TokenInJSON where
   parseJSON = withObject "TokenInJSON" $ \obj -> do
@@ -93,14 +91,15 @@ instance FromJSON DataInJSON where
 instance ToJSON DataInJSON where
   toJSON (DataInJSON userdata) = object ["data" .= userdata]
 
-type API = "register" :> ReqBody '[JSON] Credentials :> PostCreated '[JSON] UserSchema
-      :<|> "login" :>  Header "Authorization" String :> Get '[JSON] TokenInJSON
-      :<|> "user" :> (
-                               Header "x-access-tokens" Token :>                               Get '[JSON] UserSchema
-                :<|> "data" :> Header "x-access-tokens" Token :>                               Get '[JSON] DataInJSON
-                :<|> "data" :> Header "x-access-tokens" Token :> ReqBody '[JSON] DataInJSON :> PutNoContent '[PlainText] NoContent
-                :<|>           Header "x-access-tokens" Token :>                               DeleteNoContent '[PlainText] NoContent -- '[PlainText] is just there to compile, no content returned at this endpoint.
-           ) 
+type API =
+       "register" :> ReqBody '[JSON] Credentials :> PostCreated '[JSON] UserSchema
+  :<|> "login" :>  Header "Authorization" String :> Get '[JSON] TokenInJSON
+  :<|> "user" :> (
+                           Header "x-access-tokens" Token :>                               Get '[JSON] UserSchema
+            :<|> "data" :> Header "x-access-tokens" Token :>                               Get '[JSON] DataInJSON
+            :<|> "data" :> Header "x-access-tokens" Token :> ReqBody '[JSON] DataInJSON :> PutNoContent '[PlainText] NoContent -- '[PlainText] is just there to compile, no content returned at this endpoint.
+            :<|>           Header "x-access-tokens" Token :>                               DeleteNoContent '[PlainText] NoContent
+       ) 
 
 api :: Proxy API
 api = Proxy
@@ -114,26 +113,35 @@ deleteUserHandler :: Maybe Token -> ClientM NoContent
 registerHandler :<|> loginHandler :<|> (getAllHandler :<|> getVaultHandler :<|> putVaultHandler :<|> deleteUserHandler)
   = client api
 
+showError' :: Either ClientError a -> Either String a
+showError' (Left  err) = Left $ show err
+showError' (Right val) = Right val
+
 showError :: Either ClientError a -> Either String a
+showError (Left (FailureResponse _ response)) =
+  Left $ show $ responseBody response
 showError (Left  err) = Left $ show err
 showError (Right val) = Right val
 
-register :: Credentials -> IO (Either String UserSchema)
-register = fmap showError . run . registerHandler
+register :: String -> String -> IO (Either String UserSchema)
+register username password =
+  fmap showError . run . registerHandler $ Credentials username password
 
-login :: String -> String -> IO (Either String TokenInJSON)
+login :: String -> String -> IO (Either String Token)
 login username password =
-  fmap showError
-    .  run
-    .  loginHandler
-    .  Just
-    .  ("Basic " <>)
-    .  BLU.toString
-    .  B64.encode
-    .  BLU.fromString
-    $  username
-    <> ":"
-    <> password
+  showError
+    .   fmap getTokenInJSON
+    <$> (  run
+        .  loginHandler
+        .  Just
+        .  ("Basic " <>)
+        .  BLU.toString
+        .  B64.encode
+        .  BLU.fromString
+        $  username
+        <> ":"
+        <> password
+        )
 
 getAll :: Token -> IO (Either String UserSchema) -- works
 getAll = fmap showError . run . getAllHandler . Just
@@ -143,10 +151,7 @@ getVault = fmap (showError . fmap getDataInJSON) . run . getVaultHandler . Just
 
 putVault :: Token -> Userdata -> IO (Either String NoContent)
 putVault token =
-  fmap showError
-    . run
-    . putVaultHandler (Just token)
-    . DataInJSON
+  fmap showError . run . putVaultHandler (Just token) . DataInJSON
 
 deleteUser :: Token -> IO (Either String NoContent) -- works
 deleteUser = fmap showError . run . deleteUserHandler . Just
