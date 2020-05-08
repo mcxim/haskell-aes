@@ -33,6 +33,7 @@ library:
   - crypto-numbers
   - aeson
   - http-client
+  - http-media
   - servant
   - servant-client
   - text

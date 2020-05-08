@@ -3,6 +3,9 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
+{-# Language KindSignatures #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Api.Client where
 
@@ -22,11 +25,13 @@ import           GHC.Generics
 import           Network.HTTP.Client            ( newManager
                                                 , defaultManagerSettings
                                                 )
+import qualified Network.HTTP.Media            as M
 import           Servant.Client
 import           Servant.API
 import           Servant.API.ContentTypes       ( NoContent )
 import qualified System.IO                     as SIO
 import qualified Encryption.Utils              as EU
+-- import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy          as B
 import qualified Data.ByteString.Lazy.UTF8     as BLU
 import qualified Data.ByteString.Base64.Lazy   as B64
@@ -78,13 +83,23 @@ instance ToJSON Credentials where
 
 type Token = String
 
+newtype DataInJSON = DataInJSON {getDataInJSON :: String}
+
+instance FromJSON DataInJSON where
+  parseJSON = withObject "DataInJSON" $ \obj -> do
+    userdata <- obj .: "data"
+    return (DataInJSON userdata)
+
+instance ToJSON DataInJSON where
+  toJSON (DataInJSON userdata) = object ["data" .= userdata]
+
 type API = "register" :> ReqBody '[JSON] Credentials :> PostCreated '[JSON] UserSchema
       :<|> "login" :>  Header "Authorization" String :> Get '[JSON] TokenInJSON
       :<|> "user" :> (
-                               Header "x-access-tokens" Token :>                                  Get '[JSON] UserSchema
-                :<|> "data" :> Header "x-access-tokens" Token :>                                  Get '[PlainText] String
-                :<|> "data" :> Header "x-access-tokens" Token :> ReqBody '[PlainText] Userdata :> Put '[PlainText] String
-                :<|>           Header "x-access-tokens" Token :>                                  DeleteNoContent '[PlainText] NoContent
+                               Header "x-access-tokens" Token :>                               Get '[JSON] UserSchema
+                :<|> "data" :> Header "x-access-tokens" Token :>                               Get '[JSON] DataInJSON
+                :<|> "data" :> Header "x-access-tokens" Token :> ReqBody '[JSON] DataInJSON :> PutNoContent '[PlainText] NoContent
+                :<|>           Header "x-access-tokens" Token :>                               DeleteNoContent '[PlainText] NoContent -- '[PlainText] is just there to compile, no content returned at this endpoint.
            ) 
 
 api :: Proxy API
@@ -93,8 +108,8 @@ api = Proxy
 registerHandler :: Credentials -> ClientM UserSchema
 loginHandler :: Maybe Token -> ClientM TokenInJSON
 getAllHandler :: Maybe Token -> ClientM UserSchema
-getVaultHandler :: Maybe Token -> ClientM String
-putVaultHandler :: Maybe Token -> Userdata -> ClientM String
+getVaultHandler :: Maybe Token -> ClientM DataInJSON
+putVaultHandler :: Maybe Token -> DataInJSON -> ClientM NoContent
 deleteUserHandler :: Maybe Token -> ClientM NoContent
 registerHandler :<|> loginHandler :<|> (getAllHandler :<|> getVaultHandler :<|> putVaultHandler :<|> deleteUserHandler)
   = client api
@@ -120,18 +135,21 @@ login username password =
     <> ":"
     <> password
 
-getAll :: Token -> IO (Either String UserSchema)
+getAll :: Token -> IO (Either String UserSchema) -- works
 getAll = fmap showError . run . getAllHandler . Just
 
 getVault :: Token -> IO (Either String String)
-getVault = fmap showError . run . getVaultHandler . Just
+getVault = fmap (showError . fmap getDataInJSON) . run . getVaultHandler . Just
 
-putVault :: Token -> Userdata -> IO (Either String String)
-putVault token = fmap showError . run . putVaultHandler (Just token)
+putVault :: Token -> Userdata -> IO (Either String NoContent)
+putVault token =
+  fmap showError
+    . run
+    . putVaultHandler (Just token)
+    . DataInJSON
 
-deleteUser :: Token -> IO (Either String NoContent)
+deleteUser :: Token -> IO (Either String NoContent) -- works
 deleteUser = fmap showError . run . deleteUserHandler . Just
-
 
 data Entry = Entry {site :: String, name :: String, pass :: String}
   deriving (Show, Generic)
@@ -160,26 +178,10 @@ encryptData key entries = BLU.toString . B64.encode <$> ED.encryptRandomCBC
   EG.KS256
   (B.append (B.pack [99, 104, 101, 99, 107]) . encode $ entries)
 
-putData :: Token -> EG.Key -> [Entry] -> IO (Either String String)
+putData :: Token -> EG.Key -> [Entry] -> IO (Either String NoContent)
 putData token key entriesToAdd = getData token key >>= \case
   Left  err     -> return $ Left err
   Right entries -> encryptData key (entries <> entriesToAdd) >>= putVault token
-
--- addEntries
---   :: Int
---   -> EG.Key
---   -> EG.InitializationVector
---   -> [Entry]
---   -> IO (Either String UserSchema)
--- addEntries id' key iv entriesToAdd = getDataById 1 key iv >>= \case
---   Left err -> return $ Left err
---   Right entries ->
---     putUser id' (User " " (encryptData key iv (entries ++ entriesToAdd)))
-
-
--- changeName :: Int -> String -> IO (Either String UserSchema)
--- changeName id' newName = putUser id' (User newName " ")
-
 
 testB64 :: IO ()
 testB64 = do
