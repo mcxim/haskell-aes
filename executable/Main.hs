@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 module Main where
 
 import           System.IO
@@ -10,6 +12,11 @@ import qualified Data.ByteString.Base64.Lazy   as B64
 import qualified Encryption.Globals            as EG
 import qualified Encryption.EncDec             as ED
 import           Control.Monad                  ( void )
+import           Data.Maybe                     ( fromMaybe
+                                                , isJust
+                                                )
+import           Text.Read                      ( readMaybe )
+import           Debug.Trace                    ( trace )
 
 main :: IO ()
 main = void repl
@@ -26,7 +33,7 @@ emptyState = State Nothing Nothing Nothing
 welcomeMessage :: String
 welcomeMessage =
   "Welcome to the McFerrin password manager! This is a CLI tool that lets you communicate "
-  <> "with the server."
+    <> "with the server."
 
 repl :: IO State
 repl = putStrLn welcomeMessage >> loop emptyState
@@ -68,7 +75,8 @@ repl = putStrLn welcomeMessage >> loop emptyState
           "q" -> quit state
           _   -> putStrLn "Invalid command." >> loop state
       Just (token, vaultKey) -> do
-        prompt $ "Available commands: 'deleteUser', 'getData', 'addEntries', "
+        prompt
+          $  "Available commands: 'deleteUser', 'getData', 'addEntries', "
           <> "'removeEntries', 'logOut', 'q' to quit."
         command <- getLine
         case command of
@@ -77,33 +85,61 @@ repl = putStrLn welcomeMessage >> loop emptyState
             case result of
               Left  err -> putStrLn err >> loop state
               Right _   -> putStrLn "Account deleted." >> loop emptyState
-          "getData" -> case getStateData state of
-            Nothing -> do
-              result <- getData token vaultKey
-              case result of
-                Left err -> putStrLn err >> loop state
-                Right entries ->
-                  print (PPEntries entries) >> loop (state { getStateData = Just entries })
-            Just entries -> print entries >> loop state
+          "getData" ->
+            (case getStateData state of
+                Nothing      -> getData token vaultKey
+                Just entries -> return $ Right entries
+              )
+              >>= \case
+                    Left  err     -> putStrLn err >> loop state
+                    Right entries -> putStrLn (pprintEntries entries []) >> loop state
           "addEntries" -> do
             newEntries <- inputNewEntries
             result     <- case getStateData state of
               Nothing      -> putData token vaultKey newEntries
-              Just entries -> putData' token vaultKey newEntries entries
+              Just entries -> putData' token vaultKey (entries <> newEntries)
             case result of
               Left  err -> putStrLn err >> loop state
               Right _   -> putStrLn "Entries successfully added."
                 >> loop (state { getStateData = Nothing })
-          "removeEntries" -> loop state
-          "logOut"        -> loop emptyState
-          "q"             -> quit state
-          _               -> putStrLn "Invalid command." >> loop state
+          "removeEntries" ->
+            (case getStateData state of
+                Nothing      -> getData token vaultKey
+                Just entries -> return $ Right entries
+              )
+              >>= \case
+                    Left  err     -> putStrLn err >> loop state
+                    Right entries -> do
+                      print entries
+                      nums <- inputEntriesToRemove entries
+                      let idxs      = map pred nums
+                      let remaining = removeIdxsFromList idxs entries
+                      result <- putData' token vaultKey remaining
+                      case result of
+                        Left err -> putStrLn err >> loop state
+                        Right _ ->
+                          putStrLn (show (length idxs) <> " entries successfully removed.")
+                            >> loop (state { getStateData = Nothing })
+          "logOut" -> loop emptyState
+          "q"      -> quit state
+          _        -> putStrLn "Invalid command." >> loop state
+
 
 quit :: State -> IO State
 quit state = putStrLn "Ok, bye!" >> pure state
 
 prompt :: String -> IO ()
 prompt msg = putStr (msg <> "\n>>>")
+
+removeIdxsFromList :: [Int] -> [a] -> [a]
+removeIdxsFromList idxs lst = map (fromMaybe undefined) $ filter isJust $ helper
+  (filter (\i -> i < length idxs || i >= 0) idxs)
+  (map Just lst)
+ where
+  helper :: [Int] -> [Maybe a] -> [Maybe a]
+  helper []           l = l
+  helper (idx : idxs) l = helper idxs $ lft ++ [Nothing] ++ rgt
+    where (lft, _ : rgt) = splitAt idx l
 
 inputNewEntry :: IO Entry
 inputNewEntry =
@@ -122,6 +158,26 @@ inputNewEntries = loop []
       "+" -> inputNewEntry >>= (loop . flip (:) lst)
       "e" -> return lst
       _   -> loop lst
+
+inputEntriesToRemove :: [Entry] -> IO [Int]
+inputEntriesToRemove entries = loop []
+ where
+  loop :: [Int] -> IO [Int]
+  loop lst = do
+    putStrLn $ pprintEntries entries lst
+    prompt
+      "To select/deselect an entry enter its number. To delete selected entries enter 'd'."
+    input <- getLine
+    if input == "d"
+      then return lst
+      else case readMaybe input :: Maybe Int of
+        Just n  -> loop (if n `elem` lst then removeItem n lst else n : lst)
+        Nothing -> loop lst
+
+removeItem _ [] = []
+removeItem x (y : ys) | x == y    = removeItem x ys
+                      | otherwise = y : removeItem x ys
+
 
 inputCredentials :: IO (String, String)
 inputCredentials = do

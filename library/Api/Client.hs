@@ -159,33 +159,58 @@ instance ToJSON Entry
 
 instance FromJSON Entry
 
-newtype PPEntries = PPEntries [Entry]
+-- newtype PPEntries = PPEntries [Entry]
 
-instance Show PPEntries where
-  show (PPEntries entries) = header <> unlines (zipWith pprint [1 ..] entries) <> footer
+pprintEntries :: [Entry] -> [Int] -> String
+pprintEntries entries selects = header <> unlines (zipWith pprint [1 ..] entries) <> footer
+ where
+  header = "\n    Num  Website               Username         Password\n\n"
+  footer = "\n "
+  pprint :: Int -> Entry -> String
+  pprint idx entry =
+    "["
+      <> (if idx `elem` selects then "*" else " ")
+      <> "] "
+      <> showIdx
+      <> "."
+      <> safeReplicate (4 - length showIdx) ' '
+      <> showSite
+      <> safeReplicate (22 - length showSite) ' '
+      <> showUsername
+      <> safeReplicate (17 - length showUsername) ' '
+      <> showPassword
    where
-    header :: String
-    header = "\nNum  Website               Username         Password\n\n"
-    footer :: String
-    footer = "\n"
-    pprint :: Int -> Entry -> String
-    pprint idx entry =
-      showIdx
-        ++ "."
-        ++ (safeReplicate (4 - (length showIdx)) ' ')
-        ++ showSite
-        ++ (safeReplicate (22 - (length showSite)) ' ')
-        ++ showUsername
-        ++ (safeReplicate (17 - (length showUsername)) ' ')
-        ++ showPassword
-     where
-      showIdx      = show idx
-      showSite     = site entry
-      showUsername = username entry
-      showPassword = password entry
-    safeReplicate :: Int -> Char -> String
-    safeReplicate n a | n < 0     = []
-                      | otherwise = replicate n a
+    showIdx      = show idx
+    showSite     = site entry
+    showUsername = username entry
+    showPassword = password entry
+  safeReplicate :: Int -> Char -> String
+  safeReplicate n a | n < 0     = []
+                    | otherwise = replicate n a
+
+-- instance Show PPEntries where
+--   show (PPEntries entries) = header <> unlines (zipWith pprint [1 ..] entries) <> footer
+--    where
+--     header = "\nNum  Website               Username         Password\n\n"
+--     footer = "\n "
+--     pprint :: Int -> Entry -> String
+--     pprint idx entry =
+--       showIdx
+--         <> "."
+--         <> safeReplicate (4 - length showIdx) ' '
+--         <> showSite
+--         <> safeReplicate (22 - length showSite) ' '
+--         <> showUsername
+--         <> safeReplicate (17 - length showUsername) ' '
+--         <> showPassword
+--      where
+--       showIdx      = show idx
+--       showSite     = site entry
+--       showUsername = username entry
+--       showPassword = password entry
+--     safeReplicate :: Int -> Char -> String
+--     safeReplicate n a | n < 0     = []
+--                       | otherwise = replicate n a
 
 decryptData :: EG.Key -> String -> Either String [Entry]
 decryptData key data' = do
@@ -211,9 +236,9 @@ putData token key entriesToAdd = getData token key >>= \case
   Left  err     -> return $ Left err
   Right entries -> encryptData key (entries <> entriesToAdd) >>= putVault token
 
-putData' :: Token -> EG.Key -> [Entry] -> [Entry] -> IO (Either String NoContent)
-putData' token key entriesToAdd oldEntries =
-  encryptData key (oldEntries <> entriesToAdd) >>= putVault token
+putData' :: Token -> EG.Key -> [Entry] -> IO (Either String NoContent)
+putData' token key entries = encryptData key entries >>= putVault token
+
 
 testB64 :: IO ()
 testB64 = do
