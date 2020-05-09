@@ -25,7 +25,8 @@ emptyState = State Nothing Nothing Nothing
 
 welcomeMessage :: String
 welcomeMessage =
-  "Welcome to the McFerrin password manager! This is a CLI tool that lets you communicate with the server."
+  "Welcome to the McFerrin password manager! This is a CLI tool that lets you communicate "
+  <> "with the server."
 
 repl :: IO State
 repl = putStrLn welcomeMessage >> loop emptyState
@@ -67,8 +68,8 @@ repl = putStrLn welcomeMessage >> loop emptyState
           "q" -> quit state
           _   -> putStrLn "Invalid command." >> loop state
       Just (token, vaultKey) -> do
-        prompt
-          "Available commands: 'deleteUser', 'getData', 'addEntries', 'removeEntries', 'logOut', 'q' to quit."
+        prompt $ "Available commands: 'deleteUser', 'getData', 'addEntries', "
+          <> "'removeEntries', 'logOut', 'q' to quit."
         command <- getLine
         case command of
           "deleteUser" -> do
@@ -165,5 +166,3 @@ genLoginHash vaultKey username = BLU.toString $ B64.encode $ B.fromStrict $ PS.p
 zfill :: Int -> B.ByteString -> B.ByteString
 zfill n bs | B.length bs >= fromIntegral n = bs
            | otherwise = B.take (fromIntegral n) $ bs `B.append` B.replicate (fromIntegral n) 0
-
--- PS.pbkdf2 (BSU.fromString "HashMe") (PS.makeSalt (BSU.fromString "SALT8888")) 100000
