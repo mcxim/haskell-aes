@@ -38,6 +38,7 @@ library:
   - servant-client
   - text
   - utf8-string
+  - structured-cli
   source-dirs: library
 
 executables:

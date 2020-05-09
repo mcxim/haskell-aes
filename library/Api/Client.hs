@@ -113,10 +113,6 @@ deleteUserHandler :: Maybe Token -> ClientM NoContent
 registerHandler :<|> loginHandler :<|> (getAllHandler :<|> getVaultHandler :<|> putVaultHandler :<|> deleteUserHandler)
   = client api
 
-showError' :: Either ClientError a -> Either String a
-showError' (Left  err) = Left $ show err
-showError' (Right val) = Right val
-
 showError :: Either ClientError a -> Either String a
 showError (Left (FailureResponse _ response)) =
   Left $ show $ responseBody response
@@ -124,11 +120,11 @@ showError (Left  err) = Left $ show err
 showError (Right val) = Right val
 
 register :: String -> String -> IO (Either String UserSchema)
-register username password =
-  fmap showError . run . registerHandler $ Credentials username password
+register username loginHash =
+  fmap showError . run . registerHandler $ Credentials username loginHash
 
 login :: String -> String -> IO (Either String Token)
-login username password =
+login username loginHash =
   showError
     .   fmap getTokenInJSON
     <$> (  run
@@ -140,7 +136,7 @@ login username password =
         .  BLU.fromString
         $  username
         <> ":"
-        <> password
+        <> loginHash
         )
 
 getAll :: Token -> IO (Either String UserSchema) -- works
