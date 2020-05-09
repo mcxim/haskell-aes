@@ -1,6 +1,5 @@
 module Main where
 
-import qualified System.IO                     as SIO
 import           System.IO
 import           Control.Exception
 import           Api.Client
@@ -9,6 +8,7 @@ import qualified Data.ByteString.Lazy          as B
 import qualified Data.ByteString.Lazy.UTF8     as BLU
 import qualified Data.ByteString.Base64.Lazy   as B64
 import qualified Encryption.Globals            as EG
+import qualified Encryption.EncDec             as ED
 import           Control.Monad                  ( void )
 
 main :: IO ()
@@ -38,7 +38,7 @@ repl = putStrLn welcomeMessage >> loop emptyState
           return (token, vaultKey)
     case secrets of
       Nothing -> do
-        prompt "use commands 'login' or 'register'"
+        prompt "Available commands 'login' or 'register', 'q' to quit."
         command            <- getLine
         (username, master) <- inputCredentials
         let vaultKey  = genVaultKey master username
@@ -51,20 +51,24 @@ repl = putStrLn welcomeMessage >> loop emptyState
               Right token -> putStrLn "login successful!"
                 >> loop (State (Just token) (Just vaultKey) Nothing)
           "register" -> do
-            result <- register username loginHash
+            empty <- BLU.toString . B64.encode <$> ED.encryptRandomCBC
+              vaultKey
+              EG.KS256
+              (BLU.fromString "check[]")
+            result <- register username loginHash empty
             case result of
               Left  err  -> putStrLn err >> loop state
               Right user -> do
                 putStrLn
                   $  "New account created. here's some info about it:\n"
                   <> show user
-                  <> "To get started, log into your account."
+                  <> "\nTo get started, log into your account."
                 loop state
           "q" -> quit state
-          _   -> loop state
+          _   -> putStrLn "Invalid command." >> loop state
       Just (token, vaultKey) -> do
         prompt
-          "available commands: 'deleteUser', 'getData', 'addEntries', 'removeEntries'"
+          "Available commands: 'deleteUser', 'getData', 'addEntries', 'removeEntries', 'logOut', 'q' to quit."
         command <- getLine
         case command of
           "deleteUser" -> do
@@ -72,19 +76,30 @@ repl = putStrLn welcomeMessage >> loop emptyState
             case result of
               Left  err -> putStrLn err >> loop state
               Right _   -> putStrLn "Account deleted." >> loop emptyState
-          "getData" -> do
-            result <- getData token vaultKey
+          "getData" -> case getStateData state of
+            Nothing -> do
+              result <- getData token vaultKey
+              case result of
+                Left err -> putStrLn err >> loop state
+                Right entries ->
+                  print (PPEntries entries) >> loop (state { getStateData = Just entries })
+            Just entries -> print entries >> loop state
+          "addEntries" -> do
+            newEntries <- inputNewEntries
+            result     <- case getStateData state of
+              Nothing      -> putData token vaultKey newEntries
+              Just entries -> putData' token vaultKey newEntries entries
             case result of
-              Left  err     -> putStrLn err >> loop state
-              Right entries -> print entries >> loop state
-          "addEntries"    -> loop state
+              Left  err -> putStrLn err >> loop state
+              Right _   -> putStrLn "Entries successfully added."
+                >> loop (state { getStateData = Nothing })
           "removeEntries" -> loop state
           "logOut"        -> loop emptyState
           "q"             -> quit state
-          _               -> loop state
+          _               -> putStrLn "Invalid command." >> loop state
 
 quit :: State -> IO State
-quit state = putStrLn "quitting" >> pure state
+quit state = putStrLn "Ok, bye!" >> pure state
 
 prompt :: String -> IO ()
 prompt msg = putStr (msg <> "\n>>>")
@@ -92,14 +107,25 @@ prompt msg = putStr (msg <> "\n>>>")
 inputNewEntry :: IO Entry
 inputNewEntry =
   Entry
-    <$> (prompt "Input url:" >> withEcho True getLine)
-    <*> (prompt "Input username:" >> withEcho True getLine)
+    <$> (prompt "Input url:" >> getLine)
+    <*> (prompt "Input username:" >> getLine)
     <*> (prompt "Input password (hidden):" >> getPassword)
+
+inputNewEntries :: IO [Entry]
+inputNewEntries = loop []
+ where
+  loop lst = do
+    prompt "Commands: '+' to add new entry, 'e' to stop adding entries."
+    command <- getLine
+    case command of
+      "+" -> inputNewEntry >>= (loop . flip (:) lst)
+      "e" -> return lst
+      _   -> loop lst
 
 inputCredentials :: IO (String, String)
 inputCredentials = do
   prompt "Input your mcferrin username:"
-  username <- withEcho True getLine
+  username <- getLine
   prompt "Input your mcferrin password (input hidden):"
   master <- getPassword
   return (username, master)
@@ -124,25 +150,20 @@ genVaultKey master username = B.fromStrict $ PS.pbkdf2
   100100
 
 genLoginHash' :: String -> String -> String
-genLoginHash' master username =
-  BLU.toString $ B64.encode $ B.fromStrict $ PS.pbkdf2
-    (B.toStrict $ BLU.fromString master)
-    (PS.makeSalt (B.toStrict $ zfill 8 (BLU.fromString username)))
-    100101
+genLoginHash' master username = BLU.toString $ B64.encode $ B.fromStrict $ PS.pbkdf2
+  (B.toStrict $ BLU.fromString master)
+  (PS.makeSalt (B.toStrict $ zfill 8 (BLU.fromString username)))
+  100101
 
 genLoginHash :: B.ByteString -> String -> String
-genLoginHash vaultKey username =
-  BLU.toString $ B64.encode $ B.fromStrict $ PS.pbkdf2
-    (B.toStrict vaultKey)
-    (PS.makeSalt (B.toStrict $ zfill 8 (BLU.fromString username)))
-    1
+genLoginHash vaultKey username = BLU.toString $ B64.encode $ B.fromStrict $ PS.pbkdf2
+  (B.toStrict vaultKey)
+  (PS.makeSalt (B.toStrict $ zfill 8 (BLU.fromString username)))
+  1
 
 
 zfill :: Int -> B.ByteString -> B.ByteString
-zfill n bs
-  | B.length bs >= fromIntegral n = bs
-  | otherwise = B.take (fromIntegral n) $ bs `B.append` B.replicate
-    (fromIntegral n)
-    0
+zfill n bs | B.length bs >= fromIntegral n = bs
+           | otherwise = B.take (fromIntegral n) $ bs `B.append` B.replicate (fromIntegral n) 0
 
 -- PS.pbkdf2 (BSU.fromString "HashMe") (PS.makeSalt (BSU.fromString "SALT8888")) 100000

@@ -6,6 +6,7 @@
 {-# Language KindSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Api.Client where
 
@@ -67,17 +68,18 @@ instance FromJSON TokenInJSON where
     t <- obj .: "token"
     return (TokenInJSON t)
 
-data Credentials = Credentials String String
+data Credentials = Credentials String String String
 
 instance FromJSON Credentials where
   parseJSON = withObject "Credentials" $ \obj -> do
     username <- obj .: "username"
     password <- obj .: "password"
-    return (Credentials username password)
+    empty    <- obj .: "data"
+    return (Credentials username password empty)
 
 instance ToJSON Credentials where
-  toJSON (Credentials username password) =
-    object ["username" .= username, "password" .= password]
+  toJSON (Credentials username password empty) =
+    object ["username" .= username, "password" .= password, "data" .= empty]
 
 type Token = String
 
@@ -114,14 +116,13 @@ registerHandler :<|> loginHandler :<|> (getAllHandler :<|> getVaultHandler :<|> 
   = client api
 
 showError :: Either ClientError a -> Either String a
-showError (Left (FailureResponse _ response)) =
-  Left $ show $ responseBody response
-showError (Left  err) = Left $ show err
-showError (Right val) = Right val
+showError (Left  (FailureResponse _ response)) = Left $ show $ responseBody response
+showError (Left  err                         ) = Left $ show err
+showError (Right val                         ) = Right val
 
-register :: String -> String -> IO (Either String UserSchema)
-register username loginHash =
-  fmap showError . run . registerHandler $ Credentials username loginHash
+register :: String -> String -> String -> IO (Either String UserSchema)
+register username loginHash empty =
+  fmap showError . run . registerHandler $ Credentials username loginHash empty
 
 login :: String -> String -> IO (Either String Token)
 login username loginHash =
@@ -146,24 +147,50 @@ getVault :: Token -> IO (Either String String)
 getVault = fmap (showError . fmap getDataInJSON) . run . getVaultHandler . Just
 
 putVault :: Token -> Userdata -> IO (Either String NoContent)
-putVault token =
-  fmap showError . run . putVaultHandler (Just token) . DataInJSON
+putVault token = fmap showError . run . putVaultHandler (Just token) . DataInJSON
 
 deleteUser :: Token -> IO (Either String NoContent) -- works
 deleteUser = fmap showError . run . deleteUserHandler . Just
 
-data Entry = Entry {site :: String, name :: String, pass :: String}
-  deriving (Show, Generic)
+data Entry = Entry {site :: String, username :: String, password :: String}
+  deriving (Generic, Show)
 
 instance ToJSON Entry
 
 instance FromJSON Entry
 
+newtype PPEntries = PPEntries [Entry]
+
+instance Show PPEntries where
+  show (PPEntries entries) = header <> unlines (zipWith pprint [1 ..] entries) <> footer
+   where
+    header :: String
+    header = "\nNum  Website               Username         Password\n\n"
+    footer :: String
+    footer = "\n"
+    pprint :: Int -> Entry -> String
+    pprint idx entry =
+      showIdx
+        ++ "."
+        ++ (safeReplicate (4 - (length showIdx)) ' ')
+        ++ showSite
+        ++ (safeReplicate (22 - (length showSite)) ' ')
+        ++ showUsername
+        ++ (safeReplicate (17 - (length showUsername)) ' ')
+        ++ showPassword
+     where
+      showIdx      = show idx
+      showSite     = site entry
+      showUsername = username entry
+      showPassword = password entry
+    safeReplicate :: Int -> Char -> String
+    safeReplicate n a | n < 0     = []
+                      | otherwise = replicate n a
+
 decryptData :: EG.Key -> String -> Either String [Entry]
 decryptData key data' = do
   encrypted <- B64.decode (BLU.fromString data')
-  let (check, rest) =
-        B.splitAt 5 $ ED.decryptStream EG.CBC key EG.KS256 encrypted
+  let (check, rest) = B.splitAt 5 $ ED.decryptStream EG.CBC key EG.KS256 encrypted
   if check /= B.pack [99, 104, 101, 99, 107]
     then Left "Error: Decryption failed."
     else case decode rest of
@@ -183,6 +210,10 @@ putData :: Token -> EG.Key -> [Entry] -> IO (Either String NoContent)
 putData token key entriesToAdd = getData token key >>= \case
   Left  err     -> return $ Left err
   Right entries -> encryptData key (entries <> entriesToAdd) >>= putVault token
+
+putData' :: Token -> EG.Key -> [Entry] -> [Entry] -> IO (Either String NoContent)
+putData' token key entriesToAdd oldEntries =
+  encryptData key (oldEntries <> entriesToAdd) >>= putVault token
 
 testB64 :: IO ()
 testB64 = do

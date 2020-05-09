@@ -16,21 +16,12 @@ import           Crypto.Random                  ( genBytes
                                                 )
 
 encryptStream
-  :: ModeOfOperation
-  -> InitializationVector
-  -> Key
-  -> KeySize
-  -> BlockStream
-  -> BlockStream
+  :: ModeOfOperation -> InitializationVector -> Key -> KeySize -> BlockStream -> BlockStream
 encryptStream modeOfOperation iv key keySize
   | modeOfOperation == ECB
   = B.concat . map (encrypt subKeys keySize) . splitEvery 16 . padPkcs7
   | modeOfOperation == CBC
-  = B.concat
-    . (pure (padIV iv) <>)
-    . cbcEncHelper (padIV iv)
-    . splitEvery 16
-    . padPkcs7
+  = B.concat . (pure (padIV iv) <>) . cbcEncHelper (padIV iv) . splitEvery 16 . padPkcs7
   | otherwise
   = undefined
  where
@@ -53,11 +44,7 @@ decryptStream -- TODO get iv from ct
   :: ModeOfOperation -> Key -> KeySize -> BlockStream -> BlockStream
 decryptStream modeOfOperation key keySize blockstream
   | modeOfOperation == ECB
-  = B.concat
-    . unpadPkcs7
-    . map (decrypt subKeys keySize)
-    . splitEvery 16
-    $ blockstream
+  = B.concat . unpadPkcs7 . map (decrypt subKeys keySize) . splitEvery 16 $ blockstream
   | modeOfOperation == CBC
   = let (iv : blockstream') = splitEvery 16 blockstream
     in  B.concat . unpadPkcs7 . cbcDecHelper (padIV iv) $ blockstream'
@@ -69,9 +56,7 @@ decryptStream modeOfOperation key keySize blockstream
   cbcDecHelper prevCipherText [block] =
     pure $ decrypt subKeys keySize block `bsXor` prevCipherText
   cbcDecHelper prevCipherText (block : blocks) =
-    decrypt subKeys keySize block
-      `bsXor` prevCipherText
-      :       cbcDecHelper block blocks
+    decrypt subKeys keySize block `bsXor` prevCipherText : cbcDecHelper block blocks
   cbcDecHelper arg1 arg2 = error (show arg1 ++ ", " ++ show arg2)
 
 encrypt :: [SubKey] -> KeySize -> Block -> Block
@@ -105,8 +90,7 @@ toByte = fromIntegral . ord
 
 padPkcs7 :: BlockStream -> BlockStream
 padPkcs7 blocks = blocks `B.append` B.replicate padNum (fromIntegral padNum)
- where
-  padNum = let n = 16 - (B.length blocks `mod` 16) in if n == 0 then 16 else n
+  where padNum = let n = 16 - (B.length blocks `mod` 16) in if n == 0 then 16 else n
 
 unpadPkcs7 :: [Block] -> [Block]
 unpadPkcs7 blocks =
@@ -117,8 +101,7 @@ unpadPkcs7 blocks =
   padLength = B.last x
 
 padKey :: B.ByteString -> KeySize -> Key
-padKey key keySize =
-  key `B.append` B.replicate (getKeySize keySize - B.length key) 0
+padKey key keySize = key `B.append` B.replicate (getKeySize keySize - B.length key) 0
 
 padIV :: B.ByteString -> InitializationVector
 padIV iv = iv `B.append` B.replicate (16 - B.length iv) 0
