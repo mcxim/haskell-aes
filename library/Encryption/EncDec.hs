@@ -15,17 +15,28 @@ import           Crypto.Random                  ( genBytes
                                                 , SystemRandom
                                                 )
 
-encryptStream
-  :: ModeOfOperation -> InitializationVector -> Key -> KeySize -> BlockStream -> BlockStream
+encryptStream -- The function encryptStream is defined as
+  :: ModeOfOperation -- a function that takes: a mode of operation,
+  -> InitializationVector -- an initialization vector,
+  -> Key -- a key,
+  -> KeySize -- a key size,
+  -> BlockStream -- and a stream of blocks
+  -> BlockStream -- and returns a stream of blocks.
 encryptStream modeOfOperation iv key keySize
+  -- When the mode is ECB, pad the stream, split it every 16 blocks,
+  -- encrypt each block with the subkeys and concatenate the results
+  -- back into a continuous stream.
   | modeOfOperation == ECB
   = B.concat . map (encrypt subKeys keySize) . splitEvery 16 . padPkcs7
+  -- When the mode is CBC, use the CBC encryption helper function.
   | modeOfOperation == CBC
   = B.concat . (pure (padIV iv) <>) . cbcEncHelper (padIV iv) . splitEvery 16 . padPkcs7
-  | otherwise
-  = undefined
  where
+  -- Define the subkeys by calling the key schedule:
   subKeys = genSubKeys (padKey key keySize) keySize
+  -- The function cbcEncHelper is defined as a function that takes a
+  -- block and a list of blocks and returns a list of blocks. The
+  -- function recursivelly takes care of the block chaining in CBC.
   cbcEncHelper :: Block -> [Block] -> [Block]
   cbcEncHelper _         []               = []
   cbcEncHelper prevBlock (block : blocks) = result : cbcEncHelper result blocks

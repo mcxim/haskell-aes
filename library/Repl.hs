@@ -130,12 +130,15 @@ repl = putStrLn welcomeMessage >> loop emptyState
           _        -> putStrLn "Invalid command." >> loop state
 
 
+-- Quit the app by defining a base case which terminates the repl recursion.
 quit :: State -> IO State
 quit state = putStrLn "Ok, bye!" >> pure state
 
+-- A helper function which prints the prompt message the prompt characters.
 prompt :: String -> IO ()
 prompt msg = putStr (msg <> "\n>>>")
 
+-- Return a list with all the items whose indexes are in the list removed.
 removeIdxsFromList :: [Int] -> [a] -> [a]
 removeIdxsFromList idxs lst = map (fromMaybe undefined) $ filter isJust $ helper
   (filter (\i -> i < length idxs || i >= 0) idxs)
@@ -146,6 +149,7 @@ removeIdxsFromList idxs lst = map (fromMaybe undefined) $ filter isJust $ helper
   helper (idx : idxs) l = helper idxs $ lft ++ [Nothing] ++ rgt
     where (lft, _ : rgt) = splitAt idx l
 
+-- Use cool applicative tricks to return a user-given entry.
 inputNewEntry :: IO Entry
 inputNewEntry =
   Entry
@@ -153,6 +157,7 @@ inputNewEntry =
     <*> (prompt "Input username:" >> getLine)
     <*> (prompt "Input password (hidden):" >> getPassword)
 
+-- Mini repl to prompt for multiple entries.
 inputNewEntries :: IO [Entry]
 inputNewEntries = loop []
  where
@@ -164,6 +169,7 @@ inputNewEntries = loop []
       "e" -> return lst
       _   -> loop lst
 
+-- Mini repl to prompt for indexes of entries to remove.
 inputEntriesToRemove :: [Entry] -> IO [Int]
 inputEntriesToRemove entries = loop []
  where
@@ -179,11 +185,12 @@ inputEntriesToRemove entries = loop []
         Just n  -> loop (if n `elem` lst then removeItem n lst else n : lst)
         Nothing -> loop lst
 
+-- Remove item from list
 removeItem _ [] = []
 removeItem x (y : ys) | x == y    = removeItem x ys
                       | otherwise = y : removeItem x ys
 
-
+-- Prompt user to input credentials.
 inputCredentials :: IO (String, String)
 inputCredentials = do
   prompt "Input your mcferrin username:"
@@ -193,6 +200,7 @@ inputCredentials = do
   return (username, master)
 
 
+-- Get passwrod from user (input hidden).
 getPassword :: IO String
 getPassword = do
   hFlush stdout
@@ -200,23 +208,20 @@ getPassword = do
   putChar '\n'
   return pass
 
+-- Helper function for the hidden input prompt.
 withEcho :: Bool -> IO a -> IO a
 withEcho echo action = do
   old <- hGetEcho stdin
   bracket_ (hSetEcho stdin echo) (hSetEcho stdin old) action
 
+-- Generate the vault key from the master password and the username using pbkdf2.
 genVaultKey :: String -> String -> B.ByteString
 genVaultKey master username = B.fromStrict $ PS.pbkdf2
   (B.toStrict $ BLU.fromString master)
   (PS.makeSalt (B.toStrict $ zfill 8 (BLU.fromString username)))
   100100
 
-genLoginHash' :: String -> String -> String
-genLoginHash' master username = BLU.toString $ B64.encode $ B.fromStrict $ PS.pbkdf2
-  (B.toStrict $ BLU.fromString master)
-  (PS.makeSalt (B.toStrict $ zfill 8 (BLU.fromString username)))
-  100101
-
+-- Generate the login hash from the vault key and the username h using pbkdf2.
 genLoginHash :: B.ByteString -> String -> String
 genLoginHash vaultKey username = BLU.toString $ B64.encode $ B.fromStrict $ PS.pbkdf2
   (B.toStrict vaultKey)
@@ -224,6 +229,7 @@ genLoginHash vaultKey username = BLU.toString $ B64.encode $ B.fromStrict $ PS.p
   1
 
 
+-- Like the zfill function in python but for bytestrings and in haskell.
 zfill :: Int -> B.ByteString -> B.ByteString
 zfill n bs | B.length bs >= fromIntegral n = bs
            | otherwise = B.take (fromIntegral n) $ bs `B.append` B.replicate (fromIntegral n) 0

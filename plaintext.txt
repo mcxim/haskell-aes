@@ -1,1 +1,1 @@
-wuddup?
+stack exec -- ghc Main.hs -o HiHaskell
