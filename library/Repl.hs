@@ -115,7 +115,6 @@ repl = putStrLn welcomeMessage >> loop emptyState
               >>= \case
                     Left  err     -> putStrLn err >> loop state
                     Right entries -> do
-                      print entries
                       nums <- inputEntriesToRemove entries
                       let idxs      = map pred nums
                       let remaining = removeIdxsFromList idxs entries

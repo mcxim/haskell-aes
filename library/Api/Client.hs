@@ -206,6 +206,7 @@ pprintEntries entries selects = header <> unlines (zipWith pprint [1 ..] entries
   safeReplicate n a | n < 0     = []
                     | otherwise = replicate n a
 
+-- Decrypt the data (unlock the vault) using the given vault key.
 decryptData key data' = do
   encrypted <- B64.decode (BLU.fromString data')
   let (check, rest) = B.splitAt 5 $ ED.decryptStream EG.CBC key EG.KS256 encrypted

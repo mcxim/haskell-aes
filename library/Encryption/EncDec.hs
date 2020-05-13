@@ -15,6 +15,7 @@ import           Crypto.Random                  ( genBytes
                                                 , SystemRandom
                                                 )
 
+-- AES-encrypt list of blocks.
 encryptStream -- The function encryptStream is defined as
   :: ModeOfOperation -- a function that takes: a mode of operation,
   -> InitializationVector -- an initialization vector,
@@ -42,6 +43,7 @@ encryptStream modeOfOperation iv key keySize
   cbcEncHelper prevBlock (block : blocks) = result : cbcEncHelper result blocks
     where result = encrypt subKeys keySize (block `bsXor` prevBlock)
 
+-- Generate a random IV for CBC encryption.
 encryptRandomCBC :: Key -> KeySize -> BlockStream -> IO BlockStream
 encryptRandomCBC key keySize blockstream = do
   g  <- newGenIO :: IO SystemRandom
@@ -50,7 +52,7 @@ encryptRandomCBC key keySize blockstream = do
     Right (result, g2) -> return result
   return $ encryptStream CBC (B.fromStrict iv) key keySize blockstream
 
-
+-- Decrypt AES-encrypted list of blocks.
 decryptStream -- TODO get iv from ct
   :: ModeOfOperation -> Key -> KeySize -> BlockStream -> BlockStream
 decryptStream modeOfOperation key keySize blockstream
@@ -70,6 +72,7 @@ decryptStream modeOfOperation key keySize blockstream
     decrypt subKeys keySize block `bsXor` prevCipherText : cbcDecHelper block blocks
   cbcDecHelper arg1 arg2 = error (show arg1 ++ ", " ++ show arg2)
 
+-- Encrypt a single block with AES.
 encrypt :: [SubKey] -> KeySize -> Block -> Block
 encrypt subKeys keySize
   | length subKeys == 1
@@ -83,6 +86,7 @@ encrypt subKeys keySize
     . shiftRows
     . subBytes
 
+-- Decrypt a single block with AES.
 decrypt :: [SubKey] -> KeySize -> Block -> Block
 decrypt subKeys keySize
   | length subKeys == 1
@@ -96,13 +100,12 @@ decrypt subKeys keySize
     . invSubBytes
     . invShiftRows
 
-toByte :: Char -> W.Word8
-toByte = fromIntegral . ord
-
+-- Pad list of blocks with PKCS7 padding.
 padPkcs7 :: BlockStream -> BlockStream
 padPkcs7 blocks = blocks `B.append` B.replicate padNum (fromIntegral padNum)
   where padNum = let n = 16 - (B.length blocks `mod` 16) in if n == 0 then 16 else n
 
+-- Unpad list of blocks with PKCS7 padding.
 unpadPkcs7 :: [Block] -> [Block]
 unpadPkcs7 blocks =
   xs ++ [B.reverse . B.dropWhile (== fromIntegral padLength) . B.reverse $ x]
@@ -111,25 +114,10 @@ unpadPkcs7 blocks =
   x         = last blocks
   padLength = B.last x
 
+-- Pad key (fill empty space with zeros).
 padKey :: B.ByteString -> KeySize -> Key
 padKey key keySize = key `B.append` B.replicate (getKeySize keySize - B.length key) 0
 
+-- Pad iv (fill empty space with zeros).
 padIV :: B.ByteString -> InitializationVector
 padIV iv = iv `B.append` B.replicate (16 - B.length iv) 0
-
-testBS = B.pack [1]
-
-testBlock = do
-  let ks = KS128
-  testKS ks
-  putStrLn "Original block: "
-  printBS sampleBlock
-  let subKeys = genSubKeys (padKey sampleKey ks) ks
-  putStrLn "SubKeys: "
-  printBSL subKeys
-  let encryptedBlock = encrypt subKeys ks sampleBlock
-  putStrLn "Encrypted block: "
-  printBS encryptedBlock
-  let decryptedBlock = decrypt subKeys ks encryptedBlock
-  putStrLn "Decrypted block: "
-  printBS decryptedBlock
