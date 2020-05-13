@@ -16,8 +16,10 @@ import           Data.Bits                      ( xor
 import           Crypto.Number.Basic            ( log2 )
 
 
+-- Define addition in galois field as xor.
 addF2m = xor
 
+-- Define modular division in galois field.
 modF2m :: Integer -> Integer -> Integer
 modF2m fx i
   | fx < 0 || i < 0 = error
@@ -32,6 +34,7 @@ modF2m fx i
        | otherwise = go $ n `addF2m` shift fx s
     where s = log2 n - lfx
 
+-- Define multiplication in galois field.
 mulF2m :: Integer -> Integer -> Integer -> Integer
 mulF2m fx n1 n2
   | fx < 0 || n1 < 0 || n2 < 0 = error
@@ -45,16 +48,21 @@ mulF2m fx n1 n2
       then go (n `addF2m` shift n1 s) (s - 1)
       else go n (s - 1)
 
+-- Exported mixColumns layer of AES.
 mixColumns :: Block -> Block
 mixColumns = common matrix
 
+-- Exported inverted mixColumns layer of AES.
 invMixColumns :: Block -> Block
 invMixColumns = common invMatrix
 
+-- The common part of both mixColumns and invMixColumns.
 common :: [B.ByteString] -> Block -> Block
 common someMatrix =
   B.concat . map (mulMV aesPolynomial someMatrix) . splitEvery 4
 
+
+-- Multiply matrix and vector, mod the given polynomial.
 mulMV :: Integer -> [B.ByteString] -> B.ByteString -> B.ByteString
 mulMV polynomial matrix vector =
   B.pack
@@ -65,10 +73,13 @@ mulMV polynomial matrix vector =
         )
     $ matrix
 
+
+-- Multiply bytes in galois field.
 mulF2mBytes :: Integer -> W.Word8 -> W.Word8 -> Integer
 mulF2mBytes polynomial w1 w2 =
   mulF2m polynomial (fromIntegral w1) (fromIntegral w2)
 
+-- The matrix for the mixColumns layer.
 matrix = map
   B.pack
   [ [0x02, 0x03, 0x01, 0x01]
@@ -77,6 +88,7 @@ matrix = map
   , [0x03, 0x01, 0x01, 0x02]
   ]
 
+-- The matrix for the inverse mixColumns layer.
 invMatrix = map
   B.pack
   [ [0x0E, 0x0B, 0x0D, 0x09]

@@ -29,8 +29,6 @@ import           Network.HTTP.Client            ( newManager
 import           Servant.Client
 import           Servant.API
 import           Servant.API.ContentTypes       ( NoContent )
-import qualified System.IO                     as SIO
-import qualified Encryption.Utils              as EU
 import qualified Data.ByteString.Lazy          as B
 import qualified Data.ByteString.Lazy.UTF8     as BLU
 import qualified Data.ByteString.Base64.Lazy   as B64

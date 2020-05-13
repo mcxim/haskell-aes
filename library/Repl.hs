@@ -15,7 +15,6 @@ import           Data.Maybe                     ( fromMaybe
                                                 , isJust
                                                 )
 import           Text.Read                      ( readMaybe )
-import           Debug.Trace                    ( trace )
 
 -- Define algebraic data type representing the state of the repl.
 data State = State
