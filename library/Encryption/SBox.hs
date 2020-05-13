@@ -9,18 +9,23 @@ where
 import           Encryption.Globals
 import qualified Data.ByteString.Lazy               as B
 
+-- The SubBytes layer of AES.
 subBytes :: Block -> Block
 subBytes = B.map sBox
 
+-- The inverse of the SubBytes layer of AES.
 invSubBytes :: Block -> Block
 invSubBytes = B.map sBoxInv
 
+-- Applies s-box to given byte.
 sBox :: Byte -> Byte
 sBox = (_sBox !!) . fromIntegral
 
+-- Applies inverse s-box to given byte.
 sBoxInv :: Byte -> Byte
 sBoxInv = (_sBoxInv !!) . fromIntegral
 
+-- S-box.
 _sBox :: [Byte]
 _sBox =
   [ 0x63
@@ -281,6 +286,7 @@ _sBox =
   , 0x16
   ]
 
+-- Inverse s-box.
 _sBoxInv :: [Byte]
 _sBoxInv =
   [ 0x52

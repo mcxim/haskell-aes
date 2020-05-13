@@ -1,15 +1,15 @@
 module Encryption.KeySchedule
   ( genSubKeys
-  , testKS
   )
 where
 
 
-import qualified Data.ByteString.Lazy               as B
+import qualified Data.ByteString.Lazy          as B
 import           Encryption.Globals
 import           Encryption.Utils
 import           Encryption.SBox
 
+-- Generate subkeys from Key given key size.
 genSubKeys :: Key -> KeySize -> [SubKey]
 genSubKeys key KS128 =
   splitEvery 16 $ helper128 (take 10 roundCoefficients) key
@@ -18,6 +18,7 @@ genSubKeys key KS192 =
 genSubKeys key KS256 =
   splitEvery 16 $ helper256 (take 07 roundCoefficients) key
 
+-- Helper for generating subkeys of length 128 bits.
 helper128 :: [RoundCoefficient] -> B.ByteString -> B.ByteString
 helper128 []  keys         = keys
 helper128 rcs computedKeys = helper128
@@ -33,6 +34,7 @@ helper128 rcs computedKeys = helper128
     , newSubKey !! 2 `bsXor` pw4
     ] :: [B.ByteString]
 
+-- Helper for generating subkeys of length 192 bits.
 helper192 :: [RoundCoefficient] -> B.ByteString -> B.ByteString
 helper192 []  keys         = keys
 helper192 rcs computedKeys = helper192
@@ -52,6 +54,7 @@ helper192 rcs computedKeys = helper192
     , newSubKey !! 4 `bsXor` pw6
     ]
 
+-- Helper for generating subkeys of length 256 bits.
 helper256 :: [RoundCoefficient] -> B.ByteString -> B.ByteString
 helper256 []  keys         = keys
 helper256 rcs computedKeys = helper256
@@ -73,7 +76,7 @@ helper256 rcs computedKeys = helper256
     , newSubKey !! 6 `bsXor` pw8
     ]
 
-
+-- Constant AES round coefficients.
 roundCoefficients :: [RoundCoefficient]
 roundCoefficients =
   [ B.pack [0x01, 0, 0, 0]
@@ -87,14 +90,3 @@ roundCoefficients =
   , B.pack [0x1B, 0, 0, 0]
   , B.pack [0x36, 0, 0, 0]
   ]
-
-testKS ks = do
-  putStrLn "Testing Key Schedule:"
-  let key | ks == KS128 = sampleKey
-          | ks == KS192 = sampleKey192
-          | otherwise   = sampleKey256
-  putStrLn "\nKey: "
-  printBS key
-  let subKeys = genSubKeys key ks
-  putStrLn "\nResult:"
-  printBSL subKeys
