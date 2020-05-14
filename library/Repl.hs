@@ -47,7 +47,7 @@ repl = putStrLn welcomeMessage >> loop emptyState
           return (token, vaultKey)
     case secrets of
       Nothing -> do
-        prompt "Available commands 'login' or 'register', 'q' to quit."
+        prompt "Available commands: 'login' or 'register', 'q' to quit."
         command <- getLine
         case command of
           "login" -> do
